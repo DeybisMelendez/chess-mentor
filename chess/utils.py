@@ -1,5 +1,5 @@
-from datetime import timedelta
 import random
+from datetime import timedelta
 
 
 def get_week_cycle_dates(today):

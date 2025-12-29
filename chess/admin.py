@@ -1,16 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from .models import (
-    TrainingPreferences,
-    Theme,
-    TrainingCycle,
-    TrainingCycleTheme,
-    Elo,
-    ThemeElo,
-    PuzzleAttempt,
-    ActiveExercise,
-    RetryPuzzle,
-)
+
+from .models import (ActiveExercise, Elo, PuzzleAttempt, RetryPuzzle, Theme,
+                     ThemeElo, TrainingCycle, TrainingCycleTheme,
+                     TrainingPreferences)
 
 User = get_user_model()
 

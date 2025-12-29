@@ -1,6 +1,7 @@
-import sqlite3
 import random
+import sqlite3
 from pathlib import Path
+
 from django.conf import settings
 
 

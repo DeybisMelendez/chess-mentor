@@ -1,16 +1,10 @@
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth import get_user_model
 
-from .models import (
-    Theme,
-    ThemeElo,
-    TrainingPreferences,
-    TrainingCycle,
-    TrainingCycleTheme,
-    Elo,
-)
+from .models import (Elo, Theme, ThemeElo, TrainingCycle, TrainingCycleTheme,
+                     TrainingPreferences)
 
 User = get_user_model()
 

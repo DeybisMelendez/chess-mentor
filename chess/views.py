@@ -1,30 +1,21 @@
-from datetime import date
 import json
 import random
-from django.utils import timezone
+from datetime import date, datetime
+
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
-from django.http import JsonResponse, Http404
-from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_POST
-from django.utils.timezone import make_aware
-from datetime import datetime
-from django.db.models import Count, Q
-from django.db.models import Prefetch
 from django.db import transaction
-from .models import (
-    TrainingPreferences,
-    TrainingCycle,
-    TrainingCycleTheme,
-    ThemeElo,
-    PuzzleAttempt,
-    ActiveExercise,
-    RetryPuzzle,
-    Elo,
-    Theme,
-)
-from .utils import get_week_cycle_dates, pick_cycle_theme
+from django.db.models import Count, Prefetch, Q, Sum
+from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from django.utils.timezone import make_aware
+from django.views.decorators.http import require_POST
+
+from .models import (ActiveExercise, Elo, PuzzleAttempt, RetryPuzzle, Theme,
+                     ThemeElo, TrainingCycle, TrainingCycleTheme,
+                     TrainingPreferences)
 from .repository import LichessDB
+from .utils import get_week_cycle_dates, pick_cycle_theme
 
 
 @login_required
