@@ -1,5 +1,3 @@
-# chess/signals.py
-
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -86,7 +84,7 @@ def assign_cycle_themes(sender, instance, created, **kwargs):
             theme__is_trainable=True
         )
         .exclude(theme_id__in=weak_theme_ids)
-        .order_by("last_trained")
+        .order_by("-last_trained")
         .first()
     )
 
