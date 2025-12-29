@@ -86,7 +86,7 @@ def get_puzzle(request):
 
         theme_elo = ThemeElo.objects.get(user=user, theme=theme)
 
-        for delta in (50, 150, 300):
+        for delta in (25, 50, 75, 100, 150, 200, 250, 300):
             puzzle = db.get_random_puzzle(
                 rating_min=max(0, theme_elo.elo - delta),
                 rating_max=theme_elo.elo + delta,
