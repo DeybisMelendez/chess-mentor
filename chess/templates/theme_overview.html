@@ -6,7 +6,7 @@
 <h1>Elo general: {{request.user.elo.elo}}</h1>
 <h2>Temas entrenables</h2>
 {% for category in trainable_categories %}
-<details {% if forloop.first %}open{% endif %} x-data='{eloCategory: {{request.user.elo.elo}}}'>
+<details x-data='{eloCategory: {{request.user.elo.elo}}}'>
     <summary>
         <strong>{{ category.name }}</strong>
 
@@ -60,7 +60,7 @@
 
 <h2>Temas no entrenables</h2>
 {% for category in non_trainable_categories %}
-<details {% if forloop.first %}open{% endif %}
+<details
     {% if category.category_elo and category.lichess_name == 'opening' %}
     x-data='{eloCategory: {{request.user.elo.elo}}}'
     {% endif %}
