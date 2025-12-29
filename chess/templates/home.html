@@ -10,7 +10,7 @@
         <strong>Periodo:</strong> {{ cycle.start_date }} – {{ cycle.end_date }}<br>
         <strong>Ejercicios completados:</strong> {{ cycle.completed_puzzles }} / {{ cycle.total_puzzles }}<br>
         <strong>Estado:</strong>
-        {% if cycle.is_completed %}
+        {% if cycle.completed_puzzles >= cycle.total_puzzles %}
             <span>Completado</span>
         {% else %}
             <span>En progreso</span>
