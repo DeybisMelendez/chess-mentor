@@ -68,19 +68,8 @@ def assign_cycle_themes(sender, instance, created, **kwargs):
     if theme_elos.count() < 1:
         return
 
-    weak_themes = theme_elos.order_by("elo")[:2]
+    weak_themes = theme_elos.order_by("elo")[:3]
     weak_theme_ids = weak_themes.values_list("theme_id", flat=True)
-
-    least_recent = (
-        ThemeElo.objects
-        .filter(
-            user=instance.user,
-            theme__is_trainable=True
-        )
-        .exclude(theme_id__in=weak_theme_ids)
-        .order_by("-last_trained")
-        .first()
-    )
 
     objs = [
         TrainingCycleTheme(
@@ -90,14 +79,5 @@ def assign_cycle_themes(sender, instance, created, **kwargs):
         )
         for priority, theme_elo in enumerate(weak_themes, start=1)
     ]
-
-    if least_recent:
-        objs.append(
-            TrainingCycleTheme(
-                cycle=instance,
-                theme=least_recent.theme,
-                priority=3
-            )
-        )
 
     TrainingCycleTheme.objects.bulk_create(objs)

@@ -6,8 +6,7 @@ from pathlib import Path
 # ----- CONFIG -----
 CSV_FILE = "lichess_db_puzzle.csv"
 SQLITE_FILE = "lichess_puzzles.sqlite3"
-rating_deviation_threshold = 75
-min_rating = 0
+rating_deviation_threshold = 76
 BATCH_SIZE = 5000
 
 
@@ -74,7 +73,7 @@ def convert_csv_to_sqlite():
             # Filtro de estabilidad
             # -----------------------------
             try:
-                if int(row["RatingDeviation"]) >= rating_deviation_threshold or int(row["Rating"]) < min_rating:
+                if int(row["RatingDeviation"]) >= rating_deviation_threshold:
                     skipped += 1
                     continue
             except Exception:
