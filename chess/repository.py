@@ -89,8 +89,18 @@ class LichessDB:
 
         row = cursor.fetchone()
 
-        # Wrap-around
         if not row:
+            where_wrap = ["p.rating BETWEEN ? AND ?"]
+            params_wrap = [rating_min, rating_max]
+
+            if themes:
+                where_wrap.append(
+                    "t.name IN ({})".format(",".join("?" * len(themes)))
+                )
+                params_wrap.extend(themes)
+
+            where_wrap_sql = " AND ".join(where_wrap)
+
             cursor.execute(f"""
                 SELECT DISTINCT
                     p.puzzle_id,
@@ -99,10 +109,10 @@ class LichessDB:
                     p.rating
                 FROM puzzles p
                 {join}
-                WHERE p.rating BETWEEN ? AND ?
+                WHERE {where_wrap_sql}
                 ORDER BY p.rnd
                 LIMIT 1
-            """, [rating_min, rating_max] + themes)
+            """, params_wrap)
 
             row = cursor.fetchone()
 
