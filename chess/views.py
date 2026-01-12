@@ -86,6 +86,25 @@ def get_puzzle(request):
             if puzzle:
                 break
 
+    # --------------------------------------------------
+    # 4. Puzzle aleatorio por ELO del jugador (fallback absoluto)
+    # --------------------------------------------------
+    if not puzzle:
+        player_elo = (
+            getattr(user.profile, "puzzle_elo", None)
+            or ThemeElo.objects.filter(user=user).aggregate(avg=Avg("elo"))["avg"]
+            or 1200
+        )
+
+        for delta in (50, 100, 150, 200, 300, 400):
+            puzzle = db.get_random_puzzle(
+                rating_min=max(0, int(player_elo - delta)),
+                rating_max=int(player_elo + delta),
+                themes=None,  # ← MUY IMPORTANTE
+            )
+            if puzzle:
+                break
+
     ActiveExercise.objects.create(
         user=user,
         puzzle_id=puzzle["puzzle_id"],
