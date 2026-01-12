@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, Prefetch, Q, Sum, Avg
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -17,6 +17,24 @@ from .models import (ActiveExercise, Elo, PuzzleAttempt, RetryPuzzle, Theme,
 from .repository import LichessDB
 from .utils import get_week_cycle_dates, pick_cycle_theme
 
+import random
+from datetime import date
+
+from django.contrib.auth.decorators import login_required
+from django.db.models import Avg
+from django.http import Http404
+from django.shortcuts import render
+
+from .models import (
+    ActiveExercise,
+    Elo,
+    RetryPuzzle,
+    ThemeElo,
+    TrainingCycle,
+)
+from .repository import LichessDB
+from .utils import get_week_cycle_dates
+
 
 @login_required
 def get_puzzle(request):
@@ -24,6 +42,9 @@ def get_puzzle(request):
     today = date.today()
     db = LichessDB()
 
+    # --------------------------------------------------
+    # Ciclo semanal
+    # --------------------------------------------------
     start_date, end_date = get_week_cycle_dates(today)
 
     cycle, _ = TrainingCycle.objects.get_or_create(
@@ -50,13 +71,13 @@ def get_puzzle(request):
                     "themes": cycle_themes,
                 }
             )
-        # Puzzle inválido → limpiar y continuar
+        # Puzzle inválido → limpiar
         active.delete()
 
     puzzle = None
 
     # --------------------------------------------------
-    # 2. Retry puzzle (best effort)
+    # 2. Retry puzzle (10 % de probabilidad)
     # --------------------------------------------------
     retry = (
         RetryPuzzle.objects
@@ -65,45 +86,69 @@ def get_puzzle(request):
         .first()
     )
 
-    if retry and random.random() < 0.1:
+    if retry and random.random() < 0.10:
         puzzle = db.get_puzzle_by_id(retry.puzzle_id)
 
     # --------------------------------------------------
-    # 3. Puzzle por tema + elo
+    # 3. Puzzle aleatorio con los 3 temas más débiles
     # --------------------------------------------------
-    if not puzzle:
-        cycle_theme = pick_cycle_theme(cycle_themes)
-        theme = cycle_theme.theme
+    if not puzzle and cycle_themes.exists():
+        weak_cycle_themes = list(
+            cycle_themes.order_by("priority")[:3]
+        )
 
-        theme_elo = ThemeElo.objects.get(user=user, theme=theme)
+        weak_theme_names = [
+            ct.theme.lichess_name
+            for ct in weak_cycle_themes
+        ]
 
-        for delta in (25, 50, 75, 100, 150, 200, 250, 300):
-            puzzle = db.get_random_puzzle(
-                rating_min=max(0, theme_elo.elo - delta),
-                rating_max=theme_elo.elo + delta,
-                themes=[theme.lichess_name],
-            )
-            if puzzle:
-                break
+        theme_elos = ThemeElo.objects.filter(
+            user=user,
+            theme__in=[ct.theme for ct in weak_cycle_themes]
+        )
 
-    # --------------------------------------------------
-    # 4. Puzzle aleatorio por ELO del jugador (fallback absoluto)
-    # --------------------------------------------------
-    if not puzzle:
-        player_elo = (
-            getattr(user.profile, "puzzle_elo", None)
-            or ThemeElo.objects.filter(user=user).aggregate(avg=Avg("elo"))["avg"]
+        base_elo = (
+            theme_elos.aggregate(avg=Avg("elo"))["avg"]
             or 1200
         )
 
-        for delta in (50, 100, 150, 200, 300, 400):
+        for delta in (50, 100, 150, 200, 300):
             puzzle = db.get_random_puzzle(
-                rating_min=max(0, int(player_elo - delta)),
-                rating_max=int(player_elo + delta),
-                themes=None,  # ← MUY IMPORTANTE
+                rating_min=max(0, int(base_elo - delta)),
+                rating_max=int(base_elo + delta),
+                themes=weak_theme_names,  # OR lógico
             )
             if puzzle:
                 break
+
+    # --------------------------------------------------
+    # 4. Fallback absoluto: puzzle totalmente aleatorio
+    # --------------------------------------------------
+    if not puzzle:
+        player_elo = (
+            Elo.objects.filter(user=user)
+            .values_list("elo", flat=True)
+            .first()
+            or ThemeElo.objects
+            .filter(user=user)
+            .aggregate(avg=Avg("elo"))["avg"]
+            or 1200
+        )
+
+        for delta in (100, 200, 300, 400):
+            puzzle = db.get_random_puzzle(
+                rating_min=max(0, int(player_elo - delta)),
+                rating_max=int(player_elo + delta),
+                themes=None,
+            )
+            if puzzle:
+                break
+
+    # --------------------------------------------------
+    # 5. Seguridad final
+    # --------------------------------------------------
+    if not puzzle:
+        raise Http404("No puzzle available")
 
     ActiveExercise.objects.create(
         user=user,
