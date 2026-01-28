@@ -6,8 +6,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script type="module" src="https://unpkg.com/chessboard-element/bundled/chessboard-element.bundled.js"></script>
 
-<article>
-    <header class="text-center">
+ <article>
+    <header style="text-align: center;">
         <h3>Blitz Tactics</h3>
         <p>
             Puzzle <strong>{{ current_puzzle }}</strong> de <strong>{{ total_puzzles }}</strong> |
@@ -17,10 +17,10 @@
         <progress id="progress" value="{{ current_puzzle }}" max="{{ total_puzzles }}"></progress>
     </header>
 
-    <div class="margin-top-1">
+    <div style="margin-top: 1rem;">
         <details>
             <summary>Temas de la sesión (tus 10 temas más débiles)</summary>
-            <div class="display-flex flex-wrap justify-center gap-05 margin-top-05">
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 0.5rem;">
                 {% for theme in weakest_themes %}
                 <span class="theme-badge">{{ theme.name }}</span>
                 {% endfor %}
@@ -28,33 +28,33 @@
         </details>
     </div>
 
-    <p id="status" class="text-center"></p>
-    <div id="puzzle-grid" class="grid single-column">
-        <div id="result" class="display-none" style="display: none;">
-            <div id="session-result" class="text-center margin-top-1"></div>
+    <p id="status" style="text-align: center;"></p>
+    <div id="puzzle-grid" style="display: grid;">
+         <div id="result" style="display: none;">
+            <div id="session-result" style="text-align: center; margin-top: 1rem; background-color: var(--pico-card-background-color, white); border-radius: 8px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
 
-            <div class="text-center margin-top-1">
+            <div style="text-align: center; margin-top: 1rem;">
                 <button
                     id="next-puzzle-btn"
-                    class="display-none"
+                    style="display: none;"
                 >
                     Siguiente puzzle
                 </button>
-                 <a href="{% url 'blitz_tactics_results' session.id %}" role="button" id="results-btn" class="display-none">
+                 <a href="{% url 'blitz_tactics_results' session.id %}" role="button" id="results-btn" style="display: none;">
                     Ver resultados
                 </a>
             </div>
         </div>
 
         <div>
-            <p id="turn-indicator" class="text-center font-weight-bold"></p>
+            <p id="turn-indicator" style="text-align: center; font-weight: bold;"></p>
             <chess-board
                 style="width: 100%; max-width: 480px; height: auto; margin: auto; display: block;"
                 position="{{ puzzle.fen }}"
                 orientation="{{ puzzle.orientation }}"
                 draggable-pieces>
             </chess-board>
-            <div class="text-center margin-bottom-05">
+            <div style="text-align: center; margin-bottom: 0.5rem;">
         <label>
             Auto promover al coronar:
             <select id="promotion-select">
@@ -178,11 +178,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function showSessionResult(sessionStatus) {
-            resultBox.classList.remove("display-none");
-            resultBox.classList.add("display-block");
-            if (puzzleGrid) {
-                puzzleGrid.classList.remove("single-column");
-            }
+            console.log("showSessionResult called", sessionStatus);
+            resultBox.style.display = "block";
 
             let html = "<strong>Resultado del puzzle</strong><br><br>";
             html += `Puzzles resueltos: <strong>${sessionStatus.score}</strong><br>`;
@@ -198,11 +195,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else if (sessionStatus.current_puzzle_index >= {{ total_puzzles }}) {
                     html += "¡Completaste todos los puzzles!<br>";
                 }
-                resultsBtn.classList.remove("display-none");
-                resultsBtn.classList.add("display-inline-block");
+                resultsBtn.style.display = "inline-block";
             } else {
-                nextBtn.classList.remove("display-none");
-                nextBtn.classList.add("display-inline-block");
+                nextBtn.style.display = "inline-block";
             }
 
             sessionResultBox.innerHTML = html;
@@ -211,12 +206,13 @@ document.addEventListener("DOMContentLoaded", () => {
         /* =======================
          * Submit
          * ======================= */
-        function submit(solved) {
-            if (submitted) return;
-            submitted = true;
-            stopTimer();
+         function submit(solved) {
+             console.log("Submitting blitz puzzle", solved);
+             if (submitted) return;
+             submitted = true;
+             stopTimer();
 
-            const timeTaken = getTimeTaken();
+             const timeTaken = getTimeTaken();
 
             fetch(SUBMIT_URL, {
                 method: "POST",
@@ -230,27 +226,28 @@ document.addEventListener("DOMContentLoaded", () => {
                     time_taken: timeTaken
                 })
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status !== "ok") {
-                    console.error(data.message);
-                    return;
-                }
-                // Actualizar tiempo restante global
-                timeRemaining = data.session_status.time_remaining;
-                updateTimer();
-                // Actualizar fallos
-                failuresDisplay.textContent = data.session_status.failures;
+             .then(res => res.json())
+             .then(data => {
+                 console.log("Response from server", data);
+                 if (data.status !== "ok") {
+                     console.error(data.message);
+                     return;
+                 }
+                 // Actualizar tiempo restante global
+                 timeRemaining = data.session_status.time_remaining;
+                 updateTimer();
+                 // Actualizar fallos
+                 failuresDisplay.textContent = data.session_status.failures;
 
-                showSessionResult(data.session_status);
+                 showSessionResult(data.session_status);
 
-                // Si la sesión sigue activa, el botón siguiente recarga la página
-                if (data.session_status.is_active) {
-                    nextBtn.addEventListener("click", () => {
-                        window.location.reload();
-                    });
-                }
-            });
+                 // Si la sesión sigue activa, el botón siguiente recarga la página
+                 if (data.session_status.is_active) {
+                     nextBtn.addEventListener("click", () => {
+                         window.location.reload();
+                     });
+                 }
+             });
         }
 
         /* =======================
@@ -362,21 +359,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
 
-                // Juega el rival
-                setTimeout(() => {
-                    playMove(SOLUTION[moveIndex], "#2196f3");
-                }, 600);
- pdateTurn();
-                moveIndex++;
-
-                // Puzzle resuelto
-                if (!SOLUTION[moveIndex]) {
-                    statusEl.textContent = "✅ Puzzle resuelto";
-                    submit(true);
-                    return;
-                }
-
-                // Juega el rival
+                 // Juega el rival
                 setTimeout(() => {
                     playMove(SOLUTION[moveIndex], "#2196f3");
                 }, 600);
