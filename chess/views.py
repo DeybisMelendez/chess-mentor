@@ -77,7 +77,7 @@ def get_puzzle(request):
     puzzle = None
 
     # --------------------------------------------------
-    # 2. Retry puzzle (10 % de probabilidad)
+    # 2. Retry puzzle (20 % de probabilidad)
     # --------------------------------------------------
     retry = (
         RetryPuzzle.objects
@@ -86,43 +86,38 @@ def get_puzzle(request):
         .first()
     )
 
-    if retry and random.random() < 0.10:
+    if retry and random.random() < 0.20:
         puzzle = db.get_puzzle_by_id(retry.puzzle_id)
 
     # --------------------------------------------------
-    # 3. Puzzle aleatorio con los 3 temas más débiles
+    # 3. Puzzle aleatorio de los temas del ciclo
     # --------------------------------------------------
     if not puzzle and cycle_themes.exists():
-        weak_cycle_themes = list(
-            cycle_themes.order_by("priority")[:3]
-        )
-
-        weak_theme_names = [
+        # Todos los temas del ciclo
+        cycle_theme_names = [
             ct.theme.lichess_name
-            for ct in weak_cycle_themes
+            for ct in cycle_themes
         ]
 
+        # Rating promedio de los temas del ciclo
         theme_elos = ThemeElo.objects.filter(
             user=user,
-            theme__in=[ct.theme for ct in weak_cycle_themes]
+            theme__in=[ct.theme for ct in cycle_themes]
         )
-
         base_elo = (
             theme_elos.aggregate(avg=Avg("elo"))["avg"]
             or 1200
         )
 
-        for delta in (50, 100, 150, 200, 300):
-            puzzle = db.get_random_puzzle(
-                rating_min=max(0, int(base_elo - delta)),
-                rating_max=int(base_elo + delta),
-                themes=weak_theme_names,  # OR lógico
-            )
-            if puzzle:
-                break
+        # Ventana de ±100 puntos
+        puzzle = db.get_random_puzzle(
+            rating_min=max(0, int(base_elo - 100)),
+            rating_max=int(base_elo + 100),
+            themes=cycle_theme_names,
+        )
 
     # --------------------------------------------------
-    # 4. Fallback absoluto: puzzle totalmente aleatorio
+    # 4. Fallback absoluto: cualquier puzzle aleatorio
     # --------------------------------------------------
     if not puzzle:
         player_elo = (
@@ -135,14 +130,12 @@ def get_puzzle(request):
             or 1200
         )
 
-        for delta in (100, 200, 300, 400):
-            puzzle = db.get_random_puzzle(
-                rating_min=max(0, int(player_elo - delta)),
-                rating_max=int(player_elo + delta),
-                themes=None,
-            )
-            if puzzle:
-                break
+        # Ventana de ±200 puntos, sin filtro de tema
+        puzzle = db.get_random_puzzle(
+            rating_min=max(0, int(player_elo - 200)),
+            rating_max=int(player_elo + 200),
+            themes=None,
+        )
 
     # --------------------------------------------------
     # 5. Seguridad final
