@@ -7,7 +7,7 @@
 <script type="module" src="https://unpkg.com/chessboard-element/bundled/chessboard-element.bundled.js"></script>
 
 <article>
-    <header style="text-align:center">
+    <header class="text-center">
         <h3>Blitz Tactics</h3>
         <p>
             Puzzle <strong>{{ current_puzzle }}</strong> de <strong>{{ total_puzzles }}</strong> |
@@ -17,33 +17,44 @@
         <progress id="progress" value="{{ current_puzzle }}" max="{{ total_puzzles }}"></progress>
     </header>
 
-    <p id="status" style="text-align:center"></p>
-    <div class="grid">
-        <div id="result" style="display:none">
-            <div id="session-result" style="text-align:center; margin-top:1rem;"></div>
+    <div class="margin-top-1">
+        <details>
+            <summary>Temas de la sesión (tus 10 temas más débiles)</summary>
+            <div class="display-flex flex-wrap justify-center gap-05 margin-top-05">
+                {% for theme in weakest_themes %}
+                <span class="theme-badge">{{ theme.name }}</span>
+                {% endfor %}
+            </div>
+        </details>
+    </div>
 
-            <div style="text-align:center; margin-top:1rem;">
+    <p id="status" class="text-center"></p>
+    <div id="puzzle-grid" class="grid single-column">
+        <div id="result" class="display-none" style="display: none;">
+            <div id="session-result" class="text-center margin-top-1"></div>
+
+            <div class="text-center margin-top-1">
                 <button
                     id="next-puzzle-btn"
-                    style="display:none;"
+                    class="display-none"
                 >
                     Siguiente puzzle
                 </button>
-                <a href="{% url 'blitz_tactics_results' session.id %}" role="button" id="results-btn" style="display:none;">
+                 <a href="{% url 'blitz_tactics_results' session.id %}" role="button" id="results-btn" class="display-none">
                     Ver resultados
                 </a>
             </div>
         </div>
 
         <div>
-            <p id="turn-indicator" style="text-align:center;font-weight:bold"></p>
+            <p id="turn-indicator" class="text-center font-weight-bold"></p>
             <chess-board
-                style="width: 100%;max-width:400px; margin: auto"
+                style="width: 100%; max-width: 480px; height: auto; margin: auto; display: block;"
                 position="{{ puzzle.fen }}"
                 orientation="{{ puzzle.orientation }}"
                 draggable-pieces>
             </chess-board>
-            <div style="text-align:center; margin-bottom:0.5rem;">
+            <div class="text-center margin-bottom-05">
         <label>
             Auto promover al coronar:
             <select id="promotion-select">
@@ -139,6 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const sessionResultBox = document.getElementById("session-result");
         const promotionSelect = document.getElementById("promotion-select");
         const failuresDisplay = document.getElementById("failures-display");
+        const puzzleGrid = document.getElementById("puzzle-grid");
 
         /* =======================
          * Highlight de movimientos
@@ -166,7 +178,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function showSessionResult(sessionStatus) {
-            resultBox.style.display = "block";
+            resultBox.classList.remove("display-none");
+            resultBox.classList.add("display-block");
+            if (puzzleGrid) {
+                puzzleGrid.classList.remove("single-column");
+            }
 
             let html = "<strong>Resultado del puzzle</strong><br><br>";
             html += `Puzzles resueltos: <strong>${sessionStatus.score}</strong><br>`;
@@ -182,9 +198,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else if (sessionStatus.current_puzzle_index >= {{ total_puzzles }}) {
                     html += "¡Completaste todos los puzzles!<br>";
                 }
-                resultsBtn.style.display = "inline-block";
+                resultsBtn.classList.remove("display-none");
+                resultsBtn.classList.add("display-inline-block");
             } else {
-                nextBtn.style.display = "inline-block";
+                nextBtn.classList.remove("display-none");
+                nextBtn.classList.add("display-inline-block");
             }
 
             sessionResultBox.innerHTML = html;

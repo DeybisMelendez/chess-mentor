@@ -30,11 +30,11 @@
                     <td>
                         {% if session.completed %}
                             {% if session.score == session.total_puzzles %}
-                                <span style="color:green">✅ Completado</span>
+                                 <span class="text-green">✅ Completado</span>
                             {% elif session.failures >= 3 %}
-                                <span style="color:red">❌ 3 fallos</span>
+                                 <span class="text-red">❌ 3 fallos</span>
                             {% elif session.time_remaining <= 0 %}
-                                <span style="color:orange">⏰ Tiempo agotado</span>
+                                 <span class="text-orange">⏰ Tiempo agotado</span>
                             {% else %}
                                 <span>Finalizado</span>
                             {% endif %}
@@ -54,7 +54,7 @@
         <a href="{% url 'blitz_tactics_start' %}" role="button">Comenzar tu primera sesión</a>
     {% endif %}
     
-    <div style="margin-top: 2rem; text-align:center">
+     <div class="margin-top-2 text-center">
         <a href="{% url 'blitz_tactics_start' %}" role="button">Volver a Blitz Tactics</a>
     </div>
 </article>

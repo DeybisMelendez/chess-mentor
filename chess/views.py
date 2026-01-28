@@ -16,25 +16,7 @@ from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
                      TrainingPreferences)
 from .repository import LichessDB
-from .utils import get_week_cycle_dates, pick_cycle_theme, select_blitz_puzzles
-
-import random
-from datetime import date
-
-from django.contrib.auth.decorators import login_required
-from django.db.models import Avg
-from django.http import Http404
-from django.shortcuts import redirect, render
-
-from .models import (
-    ActiveExercise,
-    Elo,
-    RetryPuzzle,
-    ThemeElo,
-    TrainingCycle,
-)
-from .repository import LichessDB
-from .utils import get_week_cycle_dates
+from .utils import get_week_cycle_dates, get_weakest_themes, pick_cycle_theme, select_blitz_puzzles
 
 
 @login_required
@@ -353,6 +335,9 @@ def puzzle_history(request):
     selected_cycle_id = request.GET.get("cycle")
     selected_cycle = None
     attempts = []
+    solved_count = 0
+    failed_count = 0
+    total_count = 0
 
     if selected_cycle_id:
         selected_cycle = get_object_or_404(
@@ -376,11 +361,17 @@ def puzzle_history(request):
             )
             .order_by("-created_at")
         )
+        total_count = attempts.count()
+        solved_count = attempts.filter(solved=True).count()
+        failed_count = total_count - solved_count
 
     context = {
         "cycles": cycles,
         "selected_cycle": selected_cycle,
         "attempts": attempts,
+        "solved_count": solved_count,
+        "failed_count": failed_count,
+        "total_count": total_count,
     }
 
     return render(request, "puzzle_history.html", context)
@@ -587,6 +578,8 @@ def blitz_tactics_puzzle(request):
         session.record_failure()
         return redirect("blitz_tactics_puzzle")
     
+    weakest_themes = get_weakest_themes(user, limit=10)
+    
     context = {
         "session": session,
         "puzzle": puzzle,
@@ -594,6 +587,7 @@ def blitz_tactics_puzzle(request):
         "total_puzzles": len(session.puzzles),
         "time_remaining": session.time_remaining,
         "failures": session.failures,
+        "weakest_themes": weakest_themes,
     }
     return render(request, "blitz_tactics_puzzle.html", context)
 

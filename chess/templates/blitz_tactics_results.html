@@ -45,7 +45,7 @@
         </div>
     </div>
     
-    <div style="margin-top: 2rem;">
+    <div class="margin-top-2">
         <h3>Detalle de intentos</h3>
         {% if attempts %}
             <table role="grid">
@@ -65,9 +65,9 @@
                         <td>{{ attempt.puzzle_id|truncatechars:10 }}</td>
                         <td>
                             {% if attempt.solved %}
-                                <span style="color:green">✅</span>
+                                <span class="text-green">✅</span>
                             {% else %}
-                                <span style="color:red">❌</span>
+                                <span class="text-red">❌</span>
                             {% endif %}
                         </td>
                         <td>{% if attempt.time_taken %}{{ attempt.time_taken }}s{% else %}--{% endif %}</td>
@@ -81,7 +81,7 @@
         {% endif %}
     </div>
     
-    <div style="margin-top: 2rem; text-align:center">
+    <div class="margin-top-2 text-center">
         <a href="{% url 'blitz_tactics_start' %}" role="button">Volver a Blitz Tactics</a>
         <a href="{% url 'blitz_tactics_history' %}" role="button" class="secondary">Ver historial completo</a>
     </div>

@@ -10,11 +10,11 @@
     <summary>
         <strong>{{ category.name }}</strong>
 
-        <small class="muted" style="margin-left:.5rem;">
+        <small class="muted margin-left-05">
             ({{ category.trainable_subthemes|length }} temas)
         </small>
 
-        <span class="muted" style="margin-left:1rem;">
+        <span class="muted margin-left-1">
             Elo:
             {% if category.category_elo %}
                 {{ category.category_elo.0.elo }}
@@ -34,10 +34,12 @@
                 <tr>
                     <th>Tema</th>
                     <th>Elo</th>
+                    <th>Último entrenamiento</th>
                 </tr>
             </thead>
             <tbody>
                 {% for theme in category.trainable_subthemes %}
+                {% with theme_elo=theme.theme_elo.0 %}
                 <tr>
                     <td>
                         <strong>{{ theme.name }}</strong>
@@ -46,8 +48,16 @@
                             <small class="muted">{{ theme.description }}</small>
                         {% endif %}
                     </td>
-                    <td x-data='{elo: {{theme.theme_elo.0.elo}}}' x-text="elo" :class="elo < eloCategory-100 ? 'red' : elo > eloCategory+100 ? 'green' : 'blue'"></td>
+                    <td x-data='{elo: {{theme_elo.elo}}}' x-text="elo" :class="elo < eloCategory-100 ? 'text-red' : elo > eloCategory+100 ? 'text-green' : 'text-blue'"></td>
+                    <td>
+                        {% if theme_elo.last_trained %}
+                            {{ theme_elo.last_trained|date:"Y-m-d" }}
+                        {% else %}
+                            Nunca
+                        {% endif %}
+                    </td>
                 </tr>
+                {% endwith %}
                 {% endfor %}
             </tbody>
         </table>
@@ -68,19 +78,18 @@
     <summary>
         <strong>{{ category.name }}</strong>
 
-        <small class="muted" style="margin-left:.5rem;">
+        <small class="muted margin-left-05">
             ({{ category.trainable_subthemes|length }} temas)
         </small>
 
-        <span class="muted" style="margin-left:1rem;">
-            <td x-data='{elo: {{theme.theme_elo.0.elo}}}' x-text="elo"></td>
-            Elo:
-            {% if category.category_elo and category.lichess_name == 'opening' %}
-                {{ category.category_elo.0.elo }}
-            {% else %}
-                —
-            {% endif %}
-        </span>
+         <span class="muted margin-left-1">
+             Elo:
+             {% if category.category_elo and category.lichess_name == 'opening' %}
+                 {{ category.category_elo.0.elo }}
+             {% else %}
+                 —
+             {% endif %}
+         </span>
     </summary>
 
     {% if category.description %}
@@ -93,10 +102,12 @@
                 <tr>
                     <th>Tema</th>
                     <th>Elo</th>
+                    <th>Último entrenamiento</th>
                 </tr>
             </thead>
             <tbody>
                 {% for theme in category.trainable_subthemes %}
+                {% with theme_elo=theme.theme_elo.0 %}
                 <tr>
                     <td>
                         <strong>{{ theme.name }}</strong>
@@ -105,13 +116,21 @@
                             <small class="muted">{{ theme.description }}</small>
                         {% endif %}
                     </td>
-                    <td x-data='{elo: {{theme.theme_elo.0.elo}}}'
+                    <td x-data='{elo: {{theme_elo.elo}}}'
                     x-text="elo"
                     {% if category.category_elo and category.lichess_name == 'opening' %}
-                    :class="elo < eloCategory-100 ? 'red' : elo > eloCategory+100 ? 'green' : 'blue'"
+                    :class="elo < eloCategory-100 ? 'text-red' : elo > eloCategory+100 ? 'text-green' : 'text-blue'"
                     {% endif %}
                     ></td>
+                    <td>
+                        {% if theme_elo.last_trained %}
+                            {{ theme_elo.last_trained|date:"Y-m-d" }}
+                        {% else %}
+                            Nunca
+                        {% endif %}
+                    </td>
                 </tr>
+                {% endwith %}
                 {% endfor %}
             </tbody>
         </table>
@@ -123,15 +142,5 @@
 <hr />
 {% endfor %}
 
-<style>
-    .red {
-        color: #c22;
-    }
-    .blue {
-        color: #22c;
-    }
-    .green {
-        color: #2c2;
-    }
-</style>
+
 {% endblock %}

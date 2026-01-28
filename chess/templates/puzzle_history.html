@@ -27,41 +27,92 @@
 
 <hr>
 
-<h3>
-    Ciclo {{ selected_cycle.start_date }} → {{ selected_cycle.end_date }}
-</h3>
+    <div class="margin-bottom-2">
+    <h3>
+        Ciclo {{ selected_cycle.start_date }} → {{ selected_cycle.end_date }}
+    </h3>
 
-<table>
-    <thead>
-        <tr>
-            <th>Fecha</th>
-            <th>Ver puzzle (Lichess)</th>
-            <th>Resultado</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for attempt in attempts %}
-            <tr>
-                <td>{{ attempt.created_at|date:"Y-m-d H:i" }}</td>
-                <td>
-                    <a target="_blank" href="https://lichess.org/training/{{ attempt.puzzle_id }}">{{ attempt.puzzle_id }}</a>
-                </td>
-                <td>
-                    {% if attempt.solved %}
-                        ✅
+        <div class="stats-container">
+            <div class="stat-box">
+                <div class="stat-box__label">Total puzzles</div>
+                <div class="stat-box__value">{{ total_count }}</div>
+            </div>
+            
+            <div class="stat-box stat-box--solved">
+                <div class="stat-box__label">Resueltos</div>
+                <div class="stat-box__value stat-box__value--solved">{{ solved_count }}</div>
+                <div class="stat-box__percentage">
+                    {% if total_count > 0 %}
+                        {% widthratio solved_count total_count 100 %}%
                     {% else %}
-                        ❌
+                        0%
                     {% endif %}
-                </td>
-            </tr>
-        {% empty %}
+                </div>
+            </div>
+            
+            <div class="stat-box stat-box--failed">
+                <div class="stat-box__label">Fallidos</div>
+                <div class="stat-box__value stat-box__value--failed">{{ failed_count }}</div>
+                <div class="stat-box__percentage">
+                    {% if total_count > 0 %}
+                        {% widthratio failed_count total_count 100 %}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="stat-box stat-box--progress">
+                <div class="stat-box__label">Progreso ciclo</div>
+                <div class="stat-box__value">{{ selected_cycle.completed_puzzles }}/{{ selected_cycle.total_puzzles }}</div>
+                <progress value="{{ selected_cycle.completed_puzzles }}" max="{{ selected_cycle.total_puzzles }}" class="width-100 margin-top-05 progress-bar--cycle"></progress>
+            </div>
+        </div>
+</div>
+
+<div style="overflow-x: auto;">
+    <table class="data-table">
+        <thead>
             <tr>
-                <td colspan="4">No hay puzzles registrados en este ciclo.</td>
+                <th>Fecha</th>
+                <th>ID Puzzle</th>
+                <th>Resultado</th>
+                <th>Acciones</th>
             </tr>
-        {% endfor %}
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            {% for attempt in attempts %}
+                <tr class="{% if attempt.solved %}bg-solved{% else %}bg-failed{% endif %}">
+                    <td>{{ attempt.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <code>{{ attempt.puzzle_id|truncatechars:10 }}</code>
+                    </td>
+                    <td>
+                        {% if attempt.solved %}
+                            <span class="text-green font-weight-bold">✅ Resuelto</span>
+                        {% else %}
+                            <span class="text-red font-weight-bold">❌ Fallido</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                         <a target="_blank" href="https://lichess.org/training/{{ attempt.puzzle_id }}" class="button-link">
+                            🔗 Ver en Lichess
+                        </a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                     <td colspan="4" class="text-center padding-2">
+                        No hay puzzles registrados en este ciclo.
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 {% endif %}
+
+
 
 {% endblock %}

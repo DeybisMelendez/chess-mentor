@@ -4,13 +4,13 @@
 
 {% block content %}
 
-<article style="max-width: 420px; margin: auto;">
+<article class="max-width-420 margin-auto">
     <header>
         <h3>Iniciar sesión</h3>
     </header>
 
     {% if form.errors %}
-        <small style="color: var(--pico-color-red-500);">
+        <small class="text-red">
             Usuario o contraseña incorrectos
         </small>
     {% endif %}
