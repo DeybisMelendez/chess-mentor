@@ -30,9 +30,9 @@
     </header>
 
     <p id="status" style="text-align: center;"></p>
-    <div id="puzzle-grid" style="display: grid;">
+    <div class="grid">
         <div id="result" style="display: none;">
-            <div id="elo-result" style="text-align: center; margin-top: 1rem; background-color: var(--pico-card-background-color, white); border-radius: 8px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
+            <div id="elo-result"></div>
 
             <div style="text-align: center; margin-top: 1rem;">
                 <button
@@ -53,15 +53,15 @@
                 draggable-pieces>
             </chess-board>
             <div style="text-align: center; margin-bottom: 0.5rem;">
-        <label>
-            Auto promover al coronar:
-            <select id="promotion-select">
-                <option value="q">Dama</option>
-                <option value="r">Torre</option>
-                <option value="b">Alfil</option>
-                <option value="n">Caballo</option>
-            </select>
-        </label>
+            <label>
+                Auto promover al coronar:
+                <select id="promotion-select">
+                    <option value="q">Dama</option>
+                    <option value="r">Torre</option>
+                    <option value="b">Alfil</option>
+                    <option value="n">Caballo</option>
+                </select>
+            </label>
         </div>
     </div>
 </article>
@@ -141,13 +141,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 const borderColor = delta >= 0 ? '#2e7d32' : '#c62828';
                 const textColor = delta >= 0 ? '#2e7d32' : '#c62828';
                 html += `
-                    <div style="background: var(--pico-color-gray-100, #f5f5f5); border-radius: 8px; padding: 0.75rem; min-width: 120px; text-align: center; border-left: 4px solid ${borderColor};">
-                        <div style="font-weight: bold; font-size: 0.9rem;">${c.name}</div>
-                        <div style="font-size: 1.2rem; margin: 0.25rem 0; color: var(--pico-color-gray-900, #333);">${c.new}</div>
-                        <div style="font-size: 0.9rem; color: ${textColor};">
-                            ${trend} ${delta >= 0 ? '+' : ''}${delta}
-                            <span style="color: var(--pico-color-gray-600, #777); font-size: 0.8rem;"> desde ${c.old}</span>
-                        </div>
+                    <div>
+                        ${c.name}: ${c.old} → <strong>${c.new}</strong>
+                        <span style="color:${delta >= 0 ? "green" : "red"}">
+                            (${delta >= 0 ? "+" : ""}${delta})
+                        </span>
                     </div>
                 `;
             });

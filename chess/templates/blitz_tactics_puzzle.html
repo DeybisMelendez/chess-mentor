@@ -29,7 +29,7 @@
     </div>
 
     <p id="status" style="text-align: center;"></p>
-    <div id="puzzle-grid" style="display: grid;">
+    <div class="grid">
          <div id="result" style="display: none;">
             <div id="session-result" style="text-align: center; margin-top: 1rem; background-color: var(--pico-card-background-color, white); border-radius: 8px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
 
@@ -55,15 +55,15 @@
                 draggable-pieces>
             </chess-board>
             <div style="text-align: center; margin-bottom: 0.5rem;">
-        <label>
-            Auto promover al coronar:
-            <select id="promotion-select">
-                <option value="q">Dama</option>
-                <option value="r">Torre</option>
-                <option value="b">Alfil</option>
-                <option value="n">Caballo</option>
-            </select>
-        </label>
+            <label>
+                Auto promover al coronar:
+                <select id="promotion-select">
+                    <option value="q">Dama</option>
+                    <option value="r">Torre</option>
+                    <option value="b">Alfil</option>
+                    <option value="n">Caballo</option>
+                </select>
+            </label>
         </div>
     </div>
 </article>
