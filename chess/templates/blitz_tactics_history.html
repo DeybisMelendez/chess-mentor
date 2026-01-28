@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Blitz Tactics | Historial{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Historial de Blitz Tactics</h2>
+        <p>Tus sesiones anteriores</p>
+    </header>
+    
+    {% if sessions %}
+        <table role="grid">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Puzzles</th>
+                    <th>Fallos</th>
+                    <th>Tiempo restante</th>
+                    <th>Resultado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td>{{ session.date }}</td>
+                    <td>{{ session.score }} / {{ session.total_puzzles }}</td>
+                    <td>{{ session.failures }} / 3</td>
+                    <td>{{ session.time_remaining }}s</td>
+                    <td>
+                        {% if session.completed %}
+                            {% if session.score == session.total_puzzles %}
+                                <span style="color:green">✅ Completado</span>
+                            {% elif session.failures >= 3 %}
+                                <span style="color:red">❌ 3 fallos</span>
+                            {% elif session.time_remaining <= 0 %}
+                                <span style="color:orange">⏰ Tiempo agotado</span>
+                            {% else %}
+                                <span>Finalizado</span>
+                            {% endif %}
+                        {% else %}
+                            <span>Activo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'blitz_tactics_results' session.id %}" role="button" class="small">Ver</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No tienes sesiones registradas.</p>
+        <a href="{% url 'blitz_tactics_start' %}" role="button">Comenzar tu primera sesión</a>
+    {% endif %}
+    
+    <div style="margin-top: 2rem; text-align:center">
+        <a href="{% url 'blitz_tactics_start' %}" role="button">Volver a Blitz Tactics</a>
+    </div>
+</article>
+{% endblock %}

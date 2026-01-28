@@ -60,6 +60,11 @@ class Theme(models.Model):
             raise ValidationError(
                 "Solo se permite un nivel de jerarquía (categoría → tema)."
             )
+        
+        if self.is_trainable and not self.lichess_name:
+            raise ValidationError(
+                "Un tema entrenable debe tener un lichess_name."
+            )
 
     class Meta:
         ordering = ["name"]
@@ -86,6 +91,14 @@ class TrainingCycle(models.Model):
     completed_puzzles = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'start_date'],
+                name='unique_user_weekly_cycle'
+            )
+        ]
 
     def __str__(self):
         return f"Cycle {self.start_date} - {self.user}"
@@ -240,6 +253,107 @@ class RetryPuzzle(models.Model):
                 name="unique_retry_puzzle"
             )
         ]
+
+
+class BlitzTacticsSession(models.Model):
+    """
+    Sesión diaria del modo Blitz Tactics (Puzzle Rush / Puzzle Storm).
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blitz_sessions"
+    )
+    date = models.DateField(default=timezone.now)
+    puzzles = models.JSONField(
+        help_text="Lista de IDs de puzzles seleccionados (30 puzzles)"
+    )
+    current_puzzle_index = models.PositiveIntegerField(default=0)
+    time_remaining = models.PositiveIntegerField(
+        default=180,
+        help_text="Tiempo restante en segundos"
+    )
+    failures = models.PositiveIntegerField(
+        default=0,
+        help_text="Número de fallos acumulados (máximo 3)"
+    )
+    completed = models.BooleanField(default=False)
+    score = models.PositiveIntegerField(
+        default=0,
+        help_text="Cantidad de puzzles resueltos"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "date"],
+                name="unique_user_daily_blitz_session"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "date"]),
+        ]
+
+    def __str__(self):
+        return f"Blitz Tactics - {self.user} - {self.date}"
+
+    @property
+    def total_puzzles(self):
+        return len(self.puzzles)
+
+    @property
+    def is_active(self):
+        return not self.completed and self.failures < 3 and self.time_remaining > 0
+
+    def add_time(self, seconds):
+        self.time_remaining += seconds
+        self.save(update_fields=["time_remaining", "updated_at"])
+
+    def record_success(self):
+        self.score += 1
+        self.current_puzzle_index += 1
+        self.add_time(2)  # incremento de 2 segundos por jugada correcta
+        if self.current_puzzle_index >= self.total_puzzles:
+            self.completed = True
+        self.save(update_fields=["score", "current_puzzle_index", "completed", "updated_at"])
+
+    def record_failure(self):
+        self.failures += 1
+        self.current_puzzle_index += 1
+        if self.failures >= 3:
+            self.completed = True
+        if self.current_puzzle_index >= self.total_puzzles:
+            self.completed = True
+        self.save(update_fields=["failures", "current_puzzle_index", "completed", "updated_at"])
+
+
+class BlitzTacticsAttempt(models.Model):
+    """
+    Intento individual dentro de una sesión de Blitz Tactics.
+    """
+    session = models.ForeignKey(
+        BlitzTacticsSession,
+        on_delete=models.CASCADE,
+        related_name="attempts"
+    )
+    puzzle_id = models.CharField(max_length=100)
+    solved = models.BooleanField()
+    time_taken = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Tiempo empleado en segundos"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["session", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Attempt {self.puzzle_id} - {'Solved' if self.solved else 'Failed'}"
 
 
 """

@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}Blitz Tactics | Puzzle {{ current_puzzle }}/{{ total_puzzles }}{% endblock %}
+
+{% block content %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script type="module" src="https://unpkg.com/chessboard-element/bundled/chessboard-element.bundled.js"></script>
+
+<article>
+    <header style="text-align:center">
+        <h3>Blitz Tactics</h3>
+        <p>
+            Puzzle <strong>{{ current_puzzle }}</strong> de <strong>{{ total_puzzles }}</strong> |
+            Fallos: <strong><span id="failures-display">{{ failures }}</span>/3</strong> |
+            Tiempo: <strong><span id="timer">{{ time_remaining }}</span>s</strong>
+        </p>
+        <progress id="progress" value="{{ current_puzzle }}" max="{{ total_puzzles }}"></progress>
+    </header>
+
+    <p id="status" style="text-align:center"></p>
+    <div class="grid">
+        <div id="result" style="display:none">
+            <div id="session-result" style="text-align:center; margin-top:1rem;"></div>
+
+            <div style="text-align:center; margin-top:1rem;">
+                <button
+                    id="next-puzzle-btn"
+                    style="display:none;"
+                >
+                    Siguiente puzzle
+                </button>
+                <a href="{% url 'blitz_tactics_results' session.id %}" role="button" id="results-btn" style="display:none;">
+                    Ver resultados
+                </a>
+            </div>
+        </div>
+
+        <div>
+            <p id="turn-indicator" style="text-align:center;font-weight:bold"></p>
+            <chess-board
+                style="width: 100%;max-width:400px; margin: auto"
+                position="{{ puzzle.fen }}"
+                orientation="{{ puzzle.orientation }}"
+                draggable-pieces>
+            </chess-board>
+            <div style="text-align:center; margin-bottom:0.5rem;">
+        <label>
+            Auto promover al coronar:
+            <select id="promotion-select">
+                <option value="q">Dama</option>
+                <option value="r">Torre</option>
+                <option value="b">Alfil</option>
+                <option value="n">Caballo</option>
+            </select>
+        </label>
+        </div>
+    </div>
+</article>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    // =====================================================
+    // Temporizador global para Blitz Tactics
+    // =====================================================
+    let startTime = Date.now();
+    let timerInterval = null;
+    let timeRemaining = {{ time_remaining }};
+    const failures = {{ failures }};
+
+    function updateTimer() {
+        const timerEl = document.getElementById('timer');
+        if (timerEl) {
+            timerEl.textContent = timeRemaining;
+        }
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            if (timeRemaining <= 0) {
+                clearInterval(timerInterval);
+                // Tiempo agotado - enviar fallo automático
+                if (window.PuzzleApp && !window.PuzzleApp.submitted) {
+                    // Forzar fallo por tiempo
+                    document.getElementById('status').textContent = "⏰ Tiempo agotado";
+                    window.PuzzleApp.submit(false);
+                }
+                return;
+            }
+            timeRemaining--;
+            updateTimer();
+        }, 1000);
+    }
+
+    function stopTimer() {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }
+
+    function getTimeTaken() {
+        const endTime = Date.now();
+        return Math.floor((endTime - startTime) / 1000);
+    }
+
+    // =====================================================
+    // Puzzle App (adaptado de puzzle.html)
+    // =====================================================
+    const PuzzleApp = (() => {
+
+        /* =======================
+         * Constantes del backend
+         * ======================= */
+        const PUZZLE_ID = "{{ puzzle.puzzle_id }}";
+        const SUBMIT_URL = "{% url 'blitz_tactics_submit' %}";
+        const CSRF_TOKEN = "{{ csrf_token }}";
+        const SOLUTION = {{ puzzle.moves|safe }};
+        const FEN = "{{ puzzle.fen|escapejs }}";
+
+        /* =======================
+         * Estado interno
+         * ======================= */
+        let game;
+        let moveIndex = 0;
+        let failed = false;
+        let submitted = false;
+
+        /* =======================
+         * Cache del DOM
+         * ======================= */
+        const board = document.querySelector("chess-board");
+        const statusEl = document.getElementById("status");
+        const turnEl = document.getElementById("turn-indicator");
+        const nextBtn = document.getElementById("next-puzzle-btn");
+        const resultsBtn = document.getElementById("results-btn");
+        const resultBox = document.getElementById("result");
+        const sessionResultBox = document.getElementById("session-result");
+        const promotionSelect = document.getElementById("promotion-select");
+        const failuresDisplay = document.getElementById("failures-display");
+
+        /* =======================
+         * Highlight de movimientos
+         * ======================= */
+        const styleEl = document.createElement("style");
+        document.head.appendChild(styleEl);
+
+        function highlight(from, to, color) {
+            styleEl.textContent = `
+                chess-board::part(${from}),
+                chess-board::part(${to}) {
+                    box-shadow: inset 0 0 0 4px ${color};
+                }
+            `;
+        }
+
+        /* =======================
+         * Utilidades UI
+         * ======================= */
+        function updateTurn() {
+            turnEl.textContent =
+                game.turn() === "w"
+                    ? "Juegan blancas"
+                    : "Juegan negras";
+        }
+
+        function showSessionResult(sessionStatus) {
+            resultBox.style.display = "block";
+
+            let html = "<strong>Resultado del puzzle</strong><br><br>";
+            html += `Puzzles resueltos: <strong>${sessionStatus.score}</strong><br>`;
+            html += `Fallos: <strong>${sessionStatus.failures}</strong><br>`;
+            html += `Tiempo restante: <strong>${sessionStatus.time_remaining}s</strong><br>`;
+
+            if (!sessionStatus.is_active) {
+                html += "<br><strong>Sesión terminada</strong><br>";
+                if (sessionStatus.failures >= 3) {
+                    html += "Has alcanzado 3 fallos.<br>";
+                } else if (sessionStatus.time_remaining <= 0) {
+                    html += "Se te acabó el tiempo.<br>";
+                } else if (sessionStatus.current_puzzle_index >= {{ total_puzzles }}) {
+                    html += "¡Completaste todos los puzzles!<br>";
+                }
+                resultsBtn.style.display = "inline-block";
+            } else {
+                nextBtn.style.display = "inline-block";
+            }
+
+            sessionResultBox.innerHTML = html;
+        }
+
+        /* =======================
+         * Submit
+         * ======================= */
+        function submit(solved) {
+            if (submitted) return;
+            submitted = true;
+            stopTimer();
+
+            const timeTaken = getTimeTaken();
+
+            fetch(SUBMIT_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": CSRF_TOKEN
+                },
+                body: JSON.stringify({
+                    puzzle_id: PUZZLE_ID,
+                    solved: solved,
+                    time_taken: timeTaken
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status !== "ok") {
+                    console.error(data.message);
+                    return;
+                }
+                // Actualizar tiempo restante global
+                timeRemaining = data.session_status.time_remaining;
+                updateTimer();
+                // Actualizar fallos
+                failuresDisplay.textContent = data.session_status.failures;
+
+                showSessionResult(data.session_status);
+
+                // Si la sesión sigue activa, el botón siguiente recarga la página
+                if (data.session_status.is_active) {
+                    nextBtn.addEventListener("click", () => {
+                        window.location.reload();
+                    });
+                }
+            });
+        }
+
+        /* =======================
+         * Ejecutar jugada (motor)
+         * ======================= */
+        function playMove(moveStr, color) {
+            const move = game.move({
+                from: moveStr.slice(0, 2),
+                to: moveStr.slice(2, 4),
+                promotion: moveStr[4]
+            });
+
+            board.setPosition(game.fen());
+            highlight(move.from, move.to, color);
+            updateTurn();
+            moveIndex++;
+        }
+
+        /* =======================
+         * Inicialización
+         * ======================= */
+        function init() {
+
+            game = new Chess(FEN);
+
+            statusEl.textContent = "Resuelve el puzzle";
+            updateTurn();
+
+            // Iniciar temporizador
+            startTimer();
+
+            // Botón siguiente puzzle
+            nextBtn.addEventListener("click", () => {
+                window.location.reload();
+            });
+
+            // Primera jugada del rival
+            setTimeout(() => {
+                playMove(SOLUTION[moveIndex], "#2196f3");
+            }, 600);
+
+            /* ========= Drag start ========= */
+            board.addEventListener("drag-start", e => {
+                if (failed || game.game_over()) {
+                    e.preventDefault();
+                    return;
+                }
+
+                const { piece } = e.detail;
+                if (
+                    (game.turn() === "w" && piece.startsWith("b")) ||
+                    (game.turn() === "b" && piece.startsWith("w"))
+                ) {
+                    e.preventDefault();
+                }
+            });
+
+            /* ========= Drop ========= */
+            board.addEventListener("drop", e => {
+                const { source, target, setAction } = e.detail;
+
+                if (failed) {
+                    setAction("snapback");
+                    return;
+                }
+
+                const expected = SOLUTION[moveIndex];
+                const promotion = promotionSelect.value || "q";
+
+                // Intentar jugada en el motor (valida legalidad)
+                const move = game.move({
+                    from: source,
+                    to: target,
+                    promotion: promotion
+                });
+
+                // Jugada ilegal
+                if (!move) {
+                    setAction("snapback");
+                    return;
+                }
+
+                // Normalizar jugada ejecutada
+                const played =
+                    move.from +
+                    move.to +
+                    (move.promotion ? move.promotion : "");
+
+                // Comparar con solución
+                if (played !== expected) {
+                    failed = true;
+                    game.undo();
+                    setAction("snapback");
+                    statusEl.textContent = "❌ Movimiento incorrecto";
+                    submit(false);
+                    return;
+                }
+
+                // Jugada correcta
+                board.setPosition(game.fen());
+                highlight(move.from, move.to, "#ffc107");
+                updateTurn();
+                moveIndex++;
+
+                // Puzzle resuelto
+                if (!SOLUTION[moveIndex]) {
+                    statusEl.textContent = "✅ Puzzle resuelto";
+                    submit(true);
+                    return;
+                }
+
+                // Juega el rival
+                setTimeout(() => {
+                    playMove(SOLUTION[moveIndex], "#2196f3");
+                }, 600);
+ pdateTurn();
+                moveIndex++;
+
+                // Puzzle resuelto
+                if (!SOLUTION[moveIndex]) {
+                    statusEl.textContent = "✅ Puzzle resuelto";
+                    submit(true);
+                    return;
+                }
+
+                // Juega el rival
+                setTimeout(() => {
+                    playMove(SOLUTION[moveIndex], "#2196f3");
+                }, 600);
+            });
+        }
+
+        return { init, submit };
+    })();
+
+    // Exportar para acceso global (temporizador)
+    window.PuzzleApp = PuzzleApp;
+    PuzzleApp.init();
+});
+</script>
+{% endblock %}

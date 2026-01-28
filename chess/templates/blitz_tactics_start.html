@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Blitz Tactics | Chess Mentor{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Blitz Tactics</h2>
+        <p>Modo de entrenamiento estilo Puzzle Rush / Puzzle Storm</p>
+    </header>
+    
+    <div class="grid">
+        <div>
+            <h3>Reglas</h3>
+            <ul>
+                <li><strong>3 minutos</strong> para resolver todos los puzzles</li>
+                <li><strong>+2 segundos</strong> por cada jugada correcta</li>
+                <li><strong>3 fallos</strong> y el entrenamiento termina</li>
+                <li><strong>30 puzzles</strong> seleccionados de tus 10 temas más débiles</li>
+                <li>Rating de puzzles: tu rating -300 (±100 puntos)</li>
+                <li>No afecta tu rating Elo</li>
+                <li>Un intento por día</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>Tu sesión de hoy</h3>
+            {% if has_active_session %}
+                <p>Tienes una sesión activa. Puedes continuar donde la dejaste.</p>
+                <a href="{% url 'blitz_tactics_puzzle' %}" role="button">Continuar sesión</a>
+            {% elif completed_session %}
+                <p>Ya completaste tu sesión de hoy.</p>
+                <p><strong>Resultado:</strong> {{ completed_session.score }} puzzles resueltos</p>
+                <p><strong>Fallos:</strong> {{ completed_session.failures }}</p>
+                <p><strong>Tiempo restante:</strong> {{ completed_session.time_remaining }} segundos</p>
+                <a href="{% url 'blitz_tactics_results' completed_session.id %}" role="button">Ver detalles</a>
+            {% else %}
+                <p>Aún no has realizado tu sesión de hoy.</p>
+                <a href="{% url 'blitz_tactics_new' %}" role="button">Comenzar nueva sesión</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="margin-top: 2rem;">
+        <h3>Historial</h3>
+        <p>Revisa tus sesiones anteriores.</p>
+        <a href="{% url 'blitz_tactics_history' %}" role="button">Ver historial</a>
+    </div>
+</article>
+{% endblock %}

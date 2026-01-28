@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Blitz Tactics | Resultados{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Resultados - Blitz Tactics</h2>
+        <p>Sesión del {{ session.date }}</p>
+    </header>
+    
+    <div class="grid">
+        <div>
+            <h3>Resumen</h3>
+            <ul>
+                <li><strong>Puzzles resueltos:</strong> {{ session.score }} / {{ session.total_puzzles }}</li>
+                <li><strong>Fallos:</strong> {{ session.failures }} / 3</li>
+                <li><strong>Tiempo restante:</strong> {{ session.time_remaining }} segundos</li>
+                <li><strong>Estado:</strong> {% if session.completed %}Completado{% else %}Activo{% endif %}</li>
+                <li><strong>Duración:</strong> {{ session.created_at|timesince:session.updated_at }}</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>Rendimiento</h3>
+            <p>
+                {% if session.score == session.total_puzzles %}
+                    ¡Perfecto! Resolviste todos los puzzles.
+                {% elif session.score >= session.total_puzzles|add:"-5" %}
+                    Excelente rendimiento.
+                {% elif session.score >= session.total_puzzles|add:"-10" %}
+                    Buen trabajo.
+                {% else %}
+                    Sigue practicando.
+                {% endif %}
+            </p>
+            <p>
+                {% if session.failures == 0 %}
+                    Sin fallos, ¡impresionante!
+                {% elif session.failures < 3 %}
+                    Controlaste los fallos.
+                {% else %}
+                    Llegaste al límite de fallos.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    
+    <div style="margin-top: 2rem;">
+        <h3>Detalle de intentos</h3>
+        {% if attempts %}
+            <table role="grid">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Puzzle ID</th>
+                        <th>Resultado</th>
+                        <th>Tiempo usado</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attempt in attempts %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ attempt.puzzle_id|truncatechars:10 }}</td>
+                        <td>
+                            {% if attempt.solved %}
+                                <span style="color:green">✅</span>
+                            {% else %}
+                                <span style="color:red">❌</span>
+                            {% endif %}
+                        </td>
+                        <td>{% if attempt.time_taken %}{{ attempt.time_taken }}s{% else %}--{% endif %}</td>
+                        <td>{{ attempt.created_at|date:"H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No hay registros de intentos.</p>
+        {% endif %}
+    </div>
+    
+    <div style="margin-top: 2rem; text-align:center">
+        <a href="{% url 'blitz_tactics_start' %}" role="button">Volver a Blitz Tactics</a>
+        <a href="{% url 'blitz_tactics_history' %}" role="button" class="secondary">Ver historial completo</a>
+    </div>
+</article>
+{% endblock %}

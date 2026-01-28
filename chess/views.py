@@ -6,16 +6,17 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum, Avg
 from django.http import Http404, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.views.decorators.http import require_POST
 
-from .models import (ActiveExercise, Elo, PuzzleAttempt, RetryPuzzle, Theme,
+from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
+                     Elo, PuzzleAttempt, RetryPuzzle, Theme,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
                      TrainingPreferences)
 from .repository import LichessDB
-from .utils import get_week_cycle_dates, pick_cycle_theme
+from .utils import get_week_cycle_dates, pick_cycle_theme, select_blitz_puzzles
 
 import random
 from datetime import date
@@ -23,7 +24,7 @@ from datetime import date
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg
 from django.http import Http404
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from .models import (
     ActiveExercise,
@@ -478,3 +479,239 @@ def theme_overview(request):
             "non_trainable_categories": non_trainable_categories,
         }
     )
+
+
+@login_required
+def blitz_tactics_start(request):
+    """
+    Página de inicio del modo Blitz Tactics.
+    Si hay una sesión activa hoy, redirige al puzzle actual.
+    Si no, muestra la página de inicio con botón para comenzar.
+    """
+    user = request.user
+    today = timezone.now().date()
+    
+    # Buscar sesión activa de hoy
+    session = BlitzTacticsSession.objects.filter(
+        user=user,
+        date=today
+    ).first()
+    
+    if session and session.is_active:
+        # Redirigir al puzzle actual
+        return redirect("blitz_tactics_puzzle")
+    
+    # Si hay sesión pero no activa (completada), mostrar resultados
+    completed_session = session if session and not session.is_active else None
+    
+    context = {
+        "has_active_session": session and session.is_active,
+        "completed_session": completed_session,
+    }
+    return render(request, "blitz_tactics_start.html", context)
+
+
+@login_required
+def blitz_tactics_new(request):
+    """
+    Crea una nueva sesión de Blitz Tactics para hoy.
+    """
+    user = request.user
+    today = timezone.now().date()
+    
+    # Verificar que no exista una sesión activa
+    existing = BlitzTacticsSession.objects.filter(
+        user=user,
+        date=today
+    ).first()
+    if existing:
+        if existing.is_active:
+            return redirect("blitz_tactics_puzzle")
+        else:
+            # Si ya existe pero está completada, podemos crear una nueva? 
+            # Según reglas, solo una por día. Podemos redirigir a resultados.
+            return redirect("blitz_tactics_results", session_id=existing.id)
+    
+    # Seleccionar puzzles
+    puzzle_ids = select_blitz_puzzles(user)
+    
+    # Crear sesión
+    session = BlitzTacticsSession.objects.create(
+        user=user,
+        date=today,
+        puzzles=puzzle_ids,
+        time_remaining=180,  # 3 minutos
+        failures=0,
+        completed=False,
+        score=0,
+    )
+    
+    # Redirigir al primer puzzle
+    return redirect("blitz_tactics_puzzle")
+
+
+@login_required
+def blitz_tactics_puzzle(request):
+    """
+    Muestra el puzzle actual de la sesión activa.
+    """
+    user = request.user
+    today = timezone.now().date()
+    
+    session = BlitzTacticsSession.objects.filter(
+        user=user,
+        date=today,
+        completed=False
+    ).first()
+    
+    if not session:
+        # No hay sesión hoy, redirigir a inicio
+        return redirect("blitz_tactics_start")
+    if not session.is_active:
+        # Sesión existente pero no activa (completada), mostrar resultados
+        return redirect("blitz_tactics_results", session_id=session.id)
+    
+    current_index = session.current_puzzle_index
+    if current_index >= len(session.puzzles):
+        # Todos los puzzles completados
+        session.completed = True
+        session.save()
+        return redirect("blitz_tactics_results", session_id=session.id)
+    
+    puzzle_id = session.puzzles[current_index]
+    db = LichessDB()
+    puzzle = db.get_puzzle_by_id(puzzle_id)
+    
+    if not puzzle:
+        # Puzzle no encontrado, saltar? Marcar como fallo?
+        session.record_failure()
+        return redirect("blitz_tactics_puzzle")
+    
+    context = {
+        "session": session,
+        "puzzle": puzzle,
+        "current_puzzle": current_index + 1,
+        "total_puzzles": len(session.puzzles),
+        "time_remaining": session.time_remaining,
+        "failures": session.failures,
+    }
+    return render(request, "blitz_tactics_puzzle.html", context)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def blitz_tactics_submit(request):
+    """
+    Procesa el resultado del puzzle actual.
+    """
+    user = request.user
+    data = json.loads(request.body)
+    
+    puzzle_id = data.get("puzzle_id")
+    solved = bool(data.get("solved"))
+    time_taken = data.get("time_taken")  # segundos usados
+    
+    today = timezone.now().date()
+    session = BlitzTacticsSession.objects.filter(
+        user=user,
+        date=today,
+        completed=False
+    ).select_for_update().first()
+    
+    if not session:
+        return JsonResponse(
+            {"status": "error", "message": "No active session"},
+            status=400
+        )
+    
+    # Verificar que el puzzle_id coincida con el actual
+    current_index = session.current_puzzle_index
+    if current_index >= len(session.puzzles):
+        return JsonResponse(
+            {"status": "error", "message": "Session already completed"},
+            status=400
+        )
+    
+    if session.puzzles[current_index] != puzzle_id:
+        return JsonResponse(
+            {"status": "error", "message": "Puzzle mismatch"},
+            status=400
+        )
+    
+    # Restar tiempo usado (si se proporciona) - tiempo pasa siempre
+    if time_taken is not None:
+        try:
+            time_taken_int = int(time_taken)
+            if time_taken_int > 0:
+                session.time_remaining = max(0, session.time_remaining - time_taken_int)
+                session.save(update_fields=["time_remaining"])
+        except (ValueError, TypeError):
+            pass  # Ignorar si time_taken no es un número válido
+    
+    # Registrar intento
+    BlitzTacticsAttempt.objects.create(
+        session=session,
+        puzzle_id=puzzle_id,
+        solved=solved,
+        time_taken=time_taken
+    )
+    
+    # Actualizar sesión
+    if solved:
+        # Añadir 2 segundos por jugada correcta (record_success lo hace)
+        session.record_success()
+    else:
+        session.record_failure()
+    
+    # Verificar si la sesión sigue activa
+    if not session.is_active:
+        session.completed = True
+        session.save()
+    
+    return JsonResponse({
+        "status": "ok",
+        "session_status": {
+            "completed": session.completed,
+            "is_active": session.is_active,
+            "score": session.score,
+            "failures": session.failures,
+            "time_remaining": session.time_remaining,
+            "current_puzzle_index": session.current_puzzle_index,
+        }
+    })
+
+
+@login_required
+def blitz_tactics_results(request, session_id):
+    """
+    Muestra los resultados de una sesión completada.
+    """
+    session = get_object_or_404(
+        BlitzTacticsSession,
+        id=session_id,
+        user=request.user
+    )
+    
+    attempts = session.attempts.order_by("created_at")
+    
+    context = {
+        "session": session,
+        "attempts": attempts,
+    }
+    return render(request, "blitz_tactics_results.html", context)
+
+
+@login_required
+def blitz_tactics_history(request):
+    """
+    Historial de sesiones de Blitz Tactics del usuario.
+    """
+    sessions = BlitzTacticsSession.objects.filter(
+        user=request.user
+    ).order_by("-date")
+    
+    context = {
+        "sessions": sessions,
+    }
+    return render(request, "blitz_tactics_history.html", context)
