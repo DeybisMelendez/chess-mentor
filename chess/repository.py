@@ -1,5 +1,6 @@
 import random
 import sqlite3
+import zlib
 from pathlib import Path
 
 from django.conf import settings
@@ -17,6 +18,9 @@ class LichessDB:
 
     _conn = None  # conexión compartida
     _indexes_created = False  # índices creados
+    
+    # Umbral para decidir cuándo filtrar por rating (en puntos Elo)
+    RATING_RANGE_THRESHOLD = 2000
 
     def __init__(self):
         self.db_path = Path(settings.BASE_DIR) / "lichess_puzzles.sqlite3"
@@ -31,6 +35,20 @@ class LichessDB:
                 self.db_path,
                 check_same_thread=False
             )
+            
+            # Optimizar para lectura en PythonAnywhere (sistemas de archivos lentos)
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA journal_size_limit=16384")  # Limitar WAL a 16MB
+            cursor.execute("PRAGMA cache_size=-20000")  # 20MB cache (ajustable para PythonAnywhere)
+            cursor.execute("PRAGMA synchronous=NORMAL")  # Balance entre rendimiento y durabilidad
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA mmap_size=134217728")  # 128MB mmap (reduce syscalls)
+            cursor.execute("PRAGMA busy_timeout=3000")  # 3 segundos timeout para bloqueos
+            cursor.execute("PRAGMA optimize")  # Optimizar automáticamente consultas
+            cursor.execute("PRAGMA foreign_keys=OFF")  # Mejorar rendimiento (no necesitamos FK en lectura)
+            cursor.execute("PRAGMA page_size=4096")  # Tamaño de página estándar
+            conn.commit()
             
             # Asegurar que los índices existan (solo una vez)
             self._ensure_indexes(conn)
@@ -48,9 +66,10 @@ class LichessDB:
         
         cursor = conn.cursor()
         
-        # Lista de índices a crear
+        # Lista de índices esenciales para consultas rápidas
         indexes = [
             ("idx_puzzles_rating_rnd", "puzzles (rating, rnd)"),
+            ("idx_puzzles_rnd", "puzzles (rnd)"),  # Para consultas sin filtro de rating
             ("idx_puzzle_themes_theme_id", "puzzle_themes (theme_id)"),
             ("idx_themes_name", "themes (name)"),
         ]
@@ -71,7 +90,30 @@ class LichessDB:
         conn.commit()
         self.__class__._indexes_created = True
 
+    def _decompress_fen(self, fen_compressed):
+        """Descomprime FEN almacenado como BLOB comprimido."""
+        try:
+            return zlib.decompress(fen_compressed).decode('utf-8')
+        except:
+            # Si falla, asumir que ya es string (backwards compatibility)
+            if isinstance(fen_compressed, bytes):
+                return fen_compressed.decode('utf-8', errors='ignore')
+            return fen_compressed
+    
+    def _decompress_moves(self, moves_compressed):
+        """Descomprime moves almacenado como BLOB comprimido."""
+        try:
+            return zlib.decompress(moves_compressed).decode('utf-8')
+        except:
+            # Si falla, asumir que ya es string (backwards compatibility)
+            if isinstance(moves_compressed, bytes):
+                return moves_compressed.decode('utf-8', errors='ignore')
+            return moves_compressed
+    
     def get_board_orientation(self, fen):
+        """fen puede ser string o bytes comprimidos."""
+        if isinstance(fen, bytes):
+            fen = self._decompress_fen(fen)
         try:
             return "white" if fen.split()[1] == "b" else "black"
         except Exception:
@@ -89,8 +131,17 @@ class LichessDB:
         rnd = random.randint(0, 2**31 - 1)
 
         # Construir condiciones WHERE
-        where = ["p.rating BETWEEN ? AND ?", "p.rnd >= ?"]
-        params = [rating_min, rating_max, rnd]
+        where = []
+        params = []
+        
+        # Solo filtrar por rating si el rango no es demasiado amplio
+        # (umbral empírico: si el rango es < 2000 puntos, filtrar; si no, omitir)
+        if rating_max - rating_min < self.RATING_RANGE_THRESHOLD:
+            where.append("p.rating BETWEEN ? AND ?")
+            params.extend([rating_min, rating_max])
+        
+        where.append("p.rnd >= ?")
+        params.append(rnd)
 
         if themes:
             # Usar EXISTS en lugar de JOIN para mejor rendimiento
@@ -118,8 +169,13 @@ class LichessDB:
         row = cursor.fetchone()
 
         if not row:
-            where_wrap = ["p.rating BETWEEN ? AND ?"]
-            params_wrap = [rating_min, rating_max]
+            where_wrap = []
+            params_wrap = []
+            
+            # Aplicar mismo criterio para rating en el fallback
+            if rating_max - rating_min < self.RATING_RANGE_THRESHOLD:
+                where_wrap.append("p.rating BETWEEN ? AND ?")
+                params_wrap.extend([rating_min, rating_max])
 
             if themes:
                 where_wrap.append("""
@@ -131,6 +187,10 @@ class LichessDB:
                     )
                 """.format(",".join("?" * len(themes))))
                 params_wrap.extend(themes)
+            
+            # Si no hay condiciones, agregar una condición siempre verdadera
+            if not where_wrap:
+                where_wrap.append("1=1")
 
             where_wrap_sql = " AND ".join(where_wrap)
 
@@ -147,7 +207,11 @@ class LichessDB:
         if not row:
             return None
 
-        puzzle_id, fen, moves, rating = row
+        puzzle_id, fen_compressed, moves_compressed, rating = row
+        
+        # Descomprimir fen y moves
+        fen = self._decompress_fen(fen_compressed)
+        moves_str = self._decompress_moves(moves_compressed)
 
         # Obtener todos los themes del puzzle
         cursor.execute("""
@@ -162,7 +226,7 @@ class LichessDB:
         return {
             "puzzle_id": puzzle_id,
             "fen": fen,
-            "moves": moves.split(),
+            "moves": moves_str.split(),
             "rating": rating,
             "orientation": self.get_board_orientation(fen),
             "themes": theme_list,
@@ -184,11 +248,16 @@ class LichessDB:
         rnd = random.randint(0, 2**31 - 1)
         
         join = ""
-        where = [
-            "p.rating BETWEEN ? AND ?",
-            "p.rnd >= ?",
-        ]
-        params = [rating_min, rating_max, rnd]
+        where = []
+        params = []
+        
+        # Solo filtrar por rating si el rango no es demasiado amplio
+        if rating_max - rating_min < self.RATING_RANGE_THRESHOLD:
+            where.append("p.rating BETWEEN ? AND ?")
+            params.extend([rating_min, rating_max])
+        
+        where.append("p.rnd >= ?")
+        params.append(rnd)
         
         if themes:
             join = """
@@ -220,14 +289,23 @@ class LichessDB:
         
         # Si no encontramos suficientes, intentar sin la condición rnd >= ?
         if len(rows) < limit:
-            where_wrap = ["p.rating BETWEEN ? AND ?"]
-            params_wrap = [rating_min, rating_max]
+            where_wrap = []
+            params_wrap = []
+            
+            # Aplicar mismo criterio para rating en el fallback
+            if rating_max - rating_min < self.RATING_RANGE_THRESHOLD:
+                where_wrap.append("p.rating BETWEEN ? AND ?")
+                params_wrap.extend([rating_min, rating_max])
             
             if themes:
                 where_wrap.append(
                     "t.name IN ({})".format(",".join("?" * len(themes)))
                 )
                 params_wrap.extend(themes)
+            
+            # Si no hay condiciones, agregar una condición siempre verdadera
+            if not where_wrap:
+                where_wrap.append("1=1")
             
             where_wrap_sql = " AND ".join(where_wrap)
             
@@ -272,11 +350,15 @@ class LichessDB:
         
         # Construir resultado
         puzzles = []
-        for puzzle_id, fen, moves, rating in rows:
+        for puzzle_id, fen_compressed, moves_compressed, rating in rows:
+            # Descomprimir fen y moves
+            fen = self._decompress_fen(fen_compressed)
+            moves_str = self._decompress_moves(moves_compressed)
+            
             puzzles.append({
                 "puzzle_id": puzzle_id,
                 "fen": fen,
-                "moves": moves.split(),
+                "moves": moves_str.split(),
                 "rating": rating,
                 "orientation": self.get_board_orientation(fen),
                 "themes": themes_by_puzzle.get(puzzle_id, []),
@@ -301,7 +383,11 @@ class LichessDB:
         if not row:
             return None
 
-        puzzle_id, fen, moves, rating = row
+        puzzle_id, fen_compressed, moves_compressed, rating = row
+        
+        # Descomprimir fen y moves
+        fen = self._decompress_fen(fen_compressed)
+        moves_str = self._decompress_moves(moves_compressed)
 
         cursor.execute("""
             SELECT t.name
@@ -315,7 +401,7 @@ class LichessDB:
         return {
             "puzzle_id": puzzle_id,
             "fen": fen,
-            "moves": moves.split(),
+            "moves": moves_str.split(),
             "rating": rating,
             "orientation": self.get_board_orientation(fen),
             "themes": theme_list,

@@ -63,9 +63,29 @@ def select_blitz_puzzles(user):
         )["avg"] or 1200
         player_rating = int(avg_elo)
     
+    # Límites de rating de la base de datos (consistentes con importación)
+    DB_RATING_MIN = 1500
+    DB_RATING_MAX = 2800
+    
     target_rating = player_rating - 300
-    rating_min = max(0, target_rating - 50)
-    rating_max = target_rating + 50
+    # Asegurar que target_rating esté dentro de los límites de la base de datos
+    target_rating = max(DB_RATING_MIN, min(DB_RATING_MAX, target_rating))
+    
+    rating_min = max(DB_RATING_MIN, target_rating - 50)
+    rating_max = min(DB_RATING_MAX, target_rating + 50)
+    
+    # Asegurar que rating_min <= rating_max
+    if rating_min > rating_max:
+        rating_min, rating_max = rating_max, rating_min  # intercambiar si es necesario
+    if rating_min == rating_max:
+        # Expandir un poco el rango si es igual
+        rating_min = max(DB_RATING_MIN, rating_min - 50)
+        rating_max = min(DB_RATING_MAX, rating_max + 50)
+    
+    # Garantizar que rating_min <= rating_max (seguridad adicional)
+    if rating_min > rating_max:
+        rating_min = DB_RATING_MIN
+        rating_max = DB_RATING_MAX
     
     # Obtener temas más débiles
     weakest_themes = get_weakest_themes(user, limit=10)
@@ -84,8 +104,20 @@ def select_blitz_puzzles(user):
     
     # 2. Si no hay suficientes, relajar rating (±150 en lugar de ±50)
     if len(puzzles) < 30:
-        rating_min = max(0, player_rating - 450)
-        rating_max = player_rating - 150
+        rating_min = max(DB_RATING_MIN, player_rating - 450)
+        rating_max = min(DB_RATING_MAX, player_rating - 150)
+        # Asegurar que rating_min <= rating_max
+        if rating_min > rating_max:
+            rating_min, rating_max = rating_max, rating_min
+        if rating_min == rating_max:
+            rating_min = max(DB_RATING_MIN, rating_min - 50)
+            rating_max = min(DB_RATING_MAX, rating_max + 50)
+        
+        # Garantizar que rating_min <= rating_max (seguridad adicional)
+        if rating_min > rating_max:
+            rating_min = DB_RATING_MIN
+            rating_max = DB_RATING_MAX
+        
         additional = db.get_random_puzzles(
             rating_min=rating_min,
             rating_max=rating_max,
@@ -116,8 +148,11 @@ def select_blitz_puzzles(user):
     
     # 4. Último recurso: cualquier puzzle en rango más amplio
     if len(puzzles) < 30:
-        rating_min = max(0, player_rating - 500)
-        rating_max = player_rating - 100
+        rating_min = max(DB_RATING_MIN, player_rating - 500)
+        rating_max = min(DB_RATING_MAX, player_rating - 100)
+        if rating_min > rating_max:
+            rating_min = DB_RATING_MIN
+            rating_max = DB_RATING_MAX
         additional = db.get_random_puzzles(
             rating_min=rating_min,
             rating_max=rating_max,
