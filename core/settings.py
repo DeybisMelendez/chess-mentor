@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
-import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -26,57 +25,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = ''
+
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY', 'django-insecure-m2-s5tegtb1)+lk%_zq$ma)nh&om7+=tzus0tq96!u!g#uz*nh')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', '') == 'True'
+ALLOWED_HOSTS = ['*']
 
-if DEBUG:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
-else:
-    # En producción, restringir hosts permitidos
-    allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
-    if allowed_hosts_env:
-        ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
-    else:
-        # Fallback seguro para PythonAnywhere
-        ALLOWED_HOSTS = ['.pythonanywhere.com']
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
-
-if not SECRET_KEY:
-    if DEBUG:
-        # Solo para desarrollo local, usar una clave insegura pero específica
-        SECRET_KEY = 'django-insecure-dev-local-only-change-this-in-production'
-    else:
-        raise ValueError(
-            'DJANGO_SECRET_KEY environment variable must be set in production!'
-        )
-
-# Configuración de seguridad para producción
-if not DEBUG:
-    # HTTPS y CSRF
-    CSRF_TRUSTED_ORIGINS = ['https://*.pythonanywhere.com']
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000  # 1 año
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
-    SECURE_BROWSER_XSS_FILTER = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-
-# Cache configuration (simple local memory cache for PythonAnywhere)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-        'TIMEOUT': 300,  # 5 minutes
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000
-        }
-    }
-}
 
 # Application definition
 
@@ -168,36 +126,6 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Logging configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple'
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'chess': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-    },
-}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
