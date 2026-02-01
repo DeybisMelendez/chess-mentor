@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Vision Rush | Resultados{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Resultados - Vision Rush</h2>
+        <p>Sesión del {{ session.date }}</p>
+    </header>
+    
+    <div class="grid">
+        <div>
+            <h3>Resumen</h3>
+            <ul>
+                <li><strong>Ejercicios resueltos:</strong> {{ session.score }} / {{ session.total_exercises }}</li>
+                <li><strong>Fallos:</strong> {{ session.failures }} / 3</li>
+                <li><strong>Estado:</strong> {% if session.completed %}Completado{% else %}Activo{% endif %}</li>
+                <li><strong>Duración:</strong> {{ session.created_at|timesince:session.updated_at }}</li>
+                <li><strong>Tiempo promedio de memorización:</strong> 
+                    {% if avg_memorization %}
+                        {{ avg_memorization|floatformat:2 }} s
+                    {% else %}
+                        —
+                    {% endif %}
+                </li>
+                <li><strong>Tiempo promedio de respuesta:</strong> 
+                    {% if avg_response %}
+                        {{ avg_response|floatformat:2 }} s
+                    {% else %}
+                        —
+                    {% endif %}
+                </li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>Rendimiento</h3>
+            <p>
+                {% if session.score == session.total_exercises %}
+                    ¡Perfecto! Resolviste todos los ejercicios.
+                {% elif session.score >= session.total_exercises|add:"-5" %}
+                    Excelente rendimiento.
+                {% elif session.score >= session.total_exercises|add:"-10" %}
+                    Buen trabajo.
+                {% else %}
+                    Sigue practicando.
+                {% endif %}
+            </p>
+            <p>
+                {% if session.failures == 0 %}
+                    Sin fallos, ¡impresionante!
+                {% elif session.failures < 3 %}
+                    Controlaste los fallos.
+                {% else %}
+                    Llegaste al límite de fallos.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    
+    <div class="margin-top-2">
+        <h3>Detalle de intentos</h3>
+        {% if attempts %}
+            <table role="grid">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Pregunta</th>
+                        <th>Respuesta del usuario</th>
+                        <th>Respuesta correcta</th>
+                        <th>Resultado</th>
+                        <th>Tiempo memo.</th>
+                        <th>Tiempo resp.</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attempt in attempts %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ attempt.exercise_data.question.text|truncatechars:30 }}</td>
+                        <td>{{ attempt.user_answer|truncatechars:15 }}</td>
+                        <td>{{ attempt.exercise_data.correct_answer|truncatechars:15 }}</td>
+                        <td>
+                            {% if attempt.solved %}
+                                <span class="text-green">✅</span>
+                            {% else %}
+                                <span class="text-red">❌</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if attempt.memorization_time %}
+                                {{ attempt.memorization_time|floatformat:2 }} s
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if attempt.response_time %}
+                                {{ attempt.response_time|floatformat:2 }} s
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ attempt.created_at|date:"H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No hay registros de intentos.</p>
+        {% endif %}
+    </div>
+    
+    <div class="margin-top-2 text-center">
+        <a href="{% url 'vision_rush_start' %}" role="button">Volver a Vision Rush</a>
+        <a href="{% url 'vision_rush_history' %}" role="button" class="secondary">Ver historial completo</a>
+    </div>
+</article>
+{% endblock %}

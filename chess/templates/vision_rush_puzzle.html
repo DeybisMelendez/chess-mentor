@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}Vision Rush | Ejercicio {{ current_exercise }}/{{ total_exercises }}{% endblock %}
+
+{% block content %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script type="module" src="https://unpkg.com/chessboard-element/bundled/chessboard-element.bundled.js"></script>
+
+ <article>
+    <header style="text-align: center;">
+        <h3>Vision Rush</h3>
+        <p>
+            Ejercicio <strong>{{ current_exercise }}</strong> de <strong>{{ total_exercises }}</strong> |
+            Fallos: <strong><span id="failures-display">{{ failures }}</span>/3</strong>
+        </p>
+        <progress id="progress" value="{{ current_exercise }}" max="{{ total_exercises }}"></progress>
+    </header>
+
+    <div class="grid">
+        <!-- Fase de memorización -->
+        <div id="memorization-phase">
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center;">
+                <!-- Tablero -->
+                <div style="text-align: center;">
+                    <div id="turn-indicator" style="margin-bottom: 1rem; font-size: 1.1rem; font-weight: bold;">
+                        {% if turn == 'w' %}
+                            <span style="color: #333;">♔ Mueven las blancas</span>
+                        {% else %}
+                            <span style="color: #333;">♚ Mueven las negras</span>
+                        {% endif %}
+                    </div>
+                    <chess-board
+                        style="width: 100%; max-width: 400px; height: auto; margin: auto; display: block;"
+                        position="{{ exercise.fen }}"
+                        draggable-pieces="false">
+                    </chess-board>
+                </div>
+                
+                <!-- Instrucciones y botón -->
+                <div style="text-align: left;">
+                    <div style="margin-bottom: 2rem;">
+                        <h4 style="margin-bottom: 0.5rem;">Instrucciones</h4>
+                        <p style="color: var(--pico-muted-color); font-size: 0.95rem; line-height: 1.4;">
+                            Observa atentamente el tablero y memoriza la posición completa.
+                            Presta atención a:
+                        </p>
+                        <ul style="color: var(--pico-muted-color); font-size: 0.9rem; padding-left: 1.2rem;">
+                            <li>Ubicación de todas las piezas</li>
+                            <li>Color de cada pieza</li>
+                            <li>Quién tiene el turno</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <button id="start-exercise-btn" class="primary" style="padding: 0.8rem 2rem; font-size: 1.1rem;">
+                            Realizar ejercicio
+                        </button>
+                        <p style="margin-top: 1rem; color: var(--pico-muted-color); font-size: 0.9rem;">
+                            Cuando hayas memorizado la posición, haz clic aquí para continuar.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fase de pregunta (inicialmente oculta) -->
+        <div id="question-phase" style="display: none;">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h4>Responde la siguiente pregunta</h4>
+                <div id="question" style="margin: 1.5rem 0; font-size: 1.3rem; font-weight: bold; min-height: 3rem; padding: 1rem; background-color: var(--pico-card-background-color); border-radius: 8px;">
+                    {{ exercise.question.text }}
+                </div>
+                
+                <div style="max-width: 400px; margin: 0 auto;">
+                    <label>
+                        Tu respuesta:
+                        <input type="text" id="answer-input" placeholder="Ingresa tu respuesta" autocomplete="off" style="font-size: 1.1rem; padding: 0.8rem;">
+                    </label>
+                    <button id="submit-answer" style="margin-top: 1rem; padding: 0.8rem 2rem;">Enviar respuesta</button>
+                    <p id="feedback" style="margin-top: 1rem;"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fase de resultados (inicialmente oculta) -->
+        <div id="results-phase" style="display: none;">
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+                <!-- Tablero y resultado -->
+                <div style="text-align: center;">
+                    <div style="margin-bottom: 1rem;">
+                        <h4>Posición original</h4>
+                        <div id="result-turn-indicator" style="margin-bottom: 1rem; font-size: 1.1rem;">
+                            {% if turn == 'w' %}
+                                <span>♔ Mueven las blancas</span>
+                            {% else %}
+                                <span>♚ Mueven las negras</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <chess-board
+                        id="result-board"
+                        style="width: 100%; max-width: 400px; height: auto; margin: auto; display: block;"
+                        position="{{ exercise.fen }}"
+                        draggable-pieces="false">
+                    </chess-board>
+                </div>
+                
+                <!-- Resumen del ejercicio -->
+                <div>
+                    <div id="exercise-summary" style="background-color: var(--pico-card-background-color); border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <h4 style="margin-bottom: 1rem;">Resultado del ejercicio</h4>
+                        <div id="summary-content">
+                            <!-- Aquí se mostrará el resultado dinámicamente -->
+                        </div>
+                        
+                        <div id="navigation-buttons" style="margin-top: 2rem; text-align: center;">
+                            <button id="next-exercise-btn" style="display: none; margin: 0.5rem;">
+                                Siguiente ejercicio
+                            </button>
+                            <a href="{% url 'vision_rush_results' session.id %}" role="button" id="results-btn" style="display: none; margin: 0.5rem;">
+                                Ver resultados finales
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</article>
+
+{{ exercise|json_script:"exercise-data" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const ExerciseApp = (() => {
+        const EXERCISE = JSON.parse(document.getElementById('exercise-data').textContent);
+        const SUBMIT_URL = "{% url 'vision_rush_submit' %}";
+        const CSRF_TOKEN = "{{ csrf_token }}";
+        
+        let submitted = false;
+        let memorizationStartTime = performance.now();
+        let memorizationEndTime = null;
+        let responseStartTime = null;
+        let responseEndTime = null;
+        
+        const answerInput = document.getElementById('answer-input');
+        const submitBtn = document.getElementById('submit-answer');
+        const feedbackEl = document.getElementById('feedback');
+        const nextBtn = document.getElementById('next-exercise-btn');
+        const resultsBtn = document.getElementById('results-btn');
+        const resultBox = document.getElementById('result');
+        const sessionResultBox = document.getElementById('session-result');
+        const failuresDisplay = document.getElementById('failures-display');
+        
+        // Elementos para las tres fases
+        const startExerciseBtn = document.getElementById('start-exercise-btn');
+        const memorizationPhase = document.getElementById('memorization-phase');
+        const questionPhase = document.getElementById('question-phase');
+        const resultsPhase = document.getElementById('results-phase');
+        const summaryContent = document.getElementById('summary-content');
+        
+        // Mapeo de símbolos de pieza a nombres en español
+        function pieceSymbolToSpanish(symbol) {
+            const mapping = {
+                'P': 'peón',
+                'N': 'caballo',
+                'B': 'alfil',
+                'R': 'torre',
+                'Q': 'dama',
+                'K': 'rey'
+            };
+            return mapping[symbol] || symbol;
+        }
+        
+        // Función para obtener artículo correcto
+        function getPieceArticle(symbol) {
+            const femininePieces = new Set(['R', 'Q']); // torre, dama
+            return femininePieces.has(symbol) ? 'la' : 'el';
+        }
+        
+        function showExerciseResults(sessionStatus, solved, userAnswer) {
+            // Ocultar fase de pregunta
+            questionPhase.style.display = 'none';
+            // Mostrar fase de resultados
+            resultsPhase.style.display = 'block';
+            
+            // Actualizar fallos
+            failuresDisplay.textContent = sessionStatus.failures;
+            
+            // Construir resumen del ejercicio
+            let html = '';
+            if (solved) {
+                html += '<div style="color: green; font-size: 1.2rem; margin-bottom: 1rem;">✅ Respuesta correcta</div>';
+            } else {
+                html += '<div style="color: red; font-size: 1.2rem; margin-bottom: 1rem;">❌ Respuesta incorrecta</div>';
+            }
+            
+            html += '<div style="margin-bottom: 1.5rem;">';
+            html += `<p><strong>Pregunta:</strong><br>${EXERCISE.question.text}</p>`;
+            html += `<p><strong>Tu respuesta:</strong><br><span style="background-color: var(--pico-background-color); padding: 0.3rem 0.6rem; border-radius: 4px;">${userAnswer}</span></p>`;
+            html += `<p><strong>Respuesta correcta:</strong><br><span style="background-color: var(--pico-background-color); padding: 0.3rem 0.6rem; border-radius: 4px;">${EXERCISE.correct_answer}</span></p>`;
+            html += '</div>';
+            
+            // Resumen de sesión
+            html += '<div style="border-top: 1px solid var(--pico-muted-border-color); padding-top: 1rem;">';
+            html += `<p><strong>Progreso de la sesión:</strong></p>`;
+            html += `<p>Ejercicios resueltos: <strong>${sessionStatus.score}</strong> de {{ total_exercises }}</p>`;
+            html += `<p>Fallos: <strong>${sessionStatus.failures}</strong> de 3</p>`;
+            
+            if (!sessionStatus.is_active) {
+                html += '<p style="color: var(--pico-primary); margin-top: 1rem;"><strong>Sesión terminada</strong></p>';
+                if (sessionStatus.failures >= 3) {
+                    html += '<p>Has alcanzado 3 fallos.</p>';
+                } else if (sessionStatus.current_exercise_index >= {{ total_exercises }}) {
+                    html += '<p>¡Completaste todos los ejercicios!</p>';
+                }
+                resultsBtn.style.display = 'inline-block';
+            } else {
+                nextBtn.style.display = 'inline-block';
+            }
+            html += '</div>';
+            
+            summaryContent.innerHTML = html;
+            
+            // Configurar botones de navegación
+            if (sessionStatus.is_active) {
+                nextBtn.addEventListener("click", () => {
+                    window.location.reload();
+                });
+            }
+        }
+        
+        function submit(solved) {
+            if (submitted) return;
+            submitted = true;
+            
+            const userAnswer = answerInput.value.trim();
+            
+            // Calcular tiempos en segundos
+            let memorizationTime = null;
+            let responseTime = null;
+            
+            if (memorizationEndTime && memorizationStartTime) {
+                memorizationTime = (memorizationEndTime - memorizationStartTime) / 1000;
+            }
+            
+            // Registrar fin del tiempo de respuesta
+            responseEndTime = performance.now();
+            if (responseStartTime && responseEndTime) {
+                responseTime = (responseEndTime - responseStartTime) / 1000;
+            }
+            
+            fetch(SUBMIT_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": CSRF_TOKEN
+                },
+                body: JSON.stringify({
+                    user_answer: userAnswer,
+                    solved: solved,
+                    memorization_time: memorizationTime,
+                    response_time: responseTime
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status !== "ok") {
+                    console.error(data.message);
+                    return;
+                }
+                
+                // Mostrar resultados del ejercicio
+                showExerciseResults(data.session_status, solved, userAnswer);
+            });
+        }
+        
+        function init() {
+            // Evento para el botón "Realizar ejercicio"
+            startExerciseBtn.addEventListener("click", () => {
+                // Registrar fin del tiempo de memorización
+                memorizationEndTime = performance.now();
+                // Ocultar fase de memorización
+                memorizationPhase.style.display = 'none';
+                // Mostrar fase de pregunta
+                questionPhase.style.display = 'block';
+                // Registrar inicio del tiempo de respuesta
+                responseStartTime = performance.now();
+                // Enfocar el campo de respuesta
+                setTimeout(() => {
+                    answerInput.focus();
+                }, 100);
+            });
+            
+            // Evento para el botón "Enviar" respuesta
+            submitBtn.addEventListener("click", () => {
+                const userAnswer = answerInput.value.trim();
+                if (!userAnswer) {
+                    feedbackEl.textContent = "Por favor, ingresa una respuesta.";
+                    feedbackEl.style.color = "orange";
+                    return;
+                }
+                
+                // Comparar con respuesta correcta (insensible a mayúsculas y espacios)
+                const correct = EXERCISE.correct_answer.trim().toLowerCase();
+                const user = userAnswer.toLowerCase();
+                
+                if (user === correct) {
+                    feedbackEl.textContent = "✅ Respuesta correcta";
+                    feedbackEl.style.color = "green";
+                    submit(true);
+                } else {
+                    feedbackEl.textContent = `❌ Respuesta incorrecta. La respuesta correcta es: ${correct}`;
+                    feedbackEl.style.color = "red";
+                    submit(false);
+                }
+            });
+            
+            // Permitir enviar con Enter
+            answerInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    submitBtn.click();
+                }
+            });
+            
+            // Botón siguiente ejercicio
+            nextBtn.addEventListener("click", () => {
+                window.location.reload();
+            });
+        }
+        
+        return { init };
+    })();
+    
+    ExerciseApp.init();
+});
+</script>
+{% endblock %}

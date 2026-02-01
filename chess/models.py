@@ -356,6 +356,109 @@ class BlitzTacticsAttempt(models.Model):
         return f"Attempt {self.puzzle_id} - {'Solved' if self.solved else 'Failed'}"
 
 
+class VisionRushSession(models.Model):
+    """
+    Sesión diaria del modo Vision Rush.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="vision_rush_sessions"
+    )
+    date = models.DateField(default=timezone.now)
+    exercises = models.JSONField(
+        help_text="Lista de ejercicios seleccionados (15 ejercicios)"
+    )
+    current_exercise_index = models.PositiveIntegerField(default=0)
+    failures = models.PositiveIntegerField(
+        default=0,
+        help_text="Número de fallos acumulados"
+    )
+    completed = models.BooleanField(default=False)
+    score = models.PositiveIntegerField(
+        default=0,
+        help_text="Cantidad de ejercicios resueltos"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "date"],
+                name="unique_user_daily_vision_rush_session"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "date"]),
+        ]
+
+    def __str__(self):
+        return f"Vision Rush - {self.user} - {self.date}"
+
+    @property
+    def total_exercises(self):
+        return len(self.exercises)
+
+    @property
+    def is_active(self):
+        return not self.completed and self.failures < 3
+
+    def record_success(self):
+        self.score += 1
+        self.current_exercise_index += 1
+        if self.current_exercise_index >= self.total_exercises:
+            self.completed = True
+        self.save(update_fields=["score", "current_exercise_index", "completed", "updated_at"])
+
+    def record_failure(self):
+        self.failures += 1
+        self.current_exercise_index += 1
+        if self.failures >= 3:
+            self.completed = True
+        if self.current_exercise_index >= self.total_exercises:
+            self.completed = True
+        self.save(update_fields=["failures", "current_exercise_index", "completed", "updated_at"])
+
+
+class VisionRushAttempt(models.Model):
+    """
+    Intento individual dentro de una sesión de Vision Rush.
+    """
+    session = models.ForeignKey(
+        VisionRushSession,
+        on_delete=models.CASCADE,
+        related_name="attempts"
+    )
+    exercise_data = models.JSONField(
+        help_text="Datos del ejercicio (fen, pregunta, respuesta correcta)"
+    )
+    user_answer = models.CharField(
+        max_length=100,
+        help_text="Respuesta proporcionada por el usuario"
+    )
+    solved = models.BooleanField()
+    memorization_time = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Tiempo de memorización en segundos"
+    )
+    response_time = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Tiempo de respuesta en segundos"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["session", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Vision Rush Attempt - {'Solved' if self.solved else 'Failed'}"
+
+
 """
 class TrainingStreak(models.Model):
     user = models.OneToOneField(

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Vision Rush | Historial{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Historial de Vision Rush</h2>
+        <p>Tus sesiones anteriores</p>
+    </header>
+    
+    {% if sessions %}
+        <table role="grid">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Ejercicios</th>
+                    <th>Fallos</th>
+                    <th>Resultado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td>{{ session.date }}</td>
+                    <td>{{ session.score }} / {{ session.total_exercises }}</td>
+                    <td>{{ session.failures }} / 3</td>
+                    <td>
+                        {% if session.completed %}
+                            {% if session.score == session.total_exercises %}
+                                 <span class="text-green">✅ Completado</span>
+                            {% elif session.failures >= 3 %}
+                                 <span class="text-red">❌ 3 fallos</span>
+                            {% else %}
+                                <span>Finalizado</span>
+                            {% endif %}
+                        {% else %}
+                            <span>Activo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'vision_rush_results' session.id %}" role="button" class="small">Ver</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No tienes sesiones registradas.</p>
+        <a href="{% url 'vision_rush_start' %}" role="button">Comenzar tu primera sesión</a>
+    {% endif %}
+    
+     <div class="margin-top-2 text-center">
+        <a href="{% url 'vision_rush_start' %}" role="button">Volver a Vision Rush</a>
+    </div>
+</article>
+{% endblock %}

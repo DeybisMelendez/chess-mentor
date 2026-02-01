@@ -15,9 +15,10 @@ from django.views.decorators.http import require_POST
 from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      Elo, PuzzleAttempt, RetryPuzzle, Theme,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPreferences)
+                     TrainingPreferences, VisionRushSession, VisionRushAttempt)
 from .repository import LichessDB
-from .utils import get_week_cycle_dates, get_weakest_themes, pick_cycle_theme, select_blitz_puzzles
+from .utils import (get_week_cycle_dates, get_weakest_themes, pick_cycle_theme,
+                    select_blitz_puzzles, select_vision_rush_exercises)
 
 
 @login_required
@@ -838,3 +839,249 @@ def blitz_tactics_history(request):
         "sessions": sessions,
     }
     return render(request, "blitz_tactics_history.html", context)
+
+
+@login_required
+def vision_rush_start(request):
+    """
+    Página de inicio del modo Vision Rush.
+    Si hay una sesión activa hoy, redirige al ejercicio actual.
+    Si no, muestra la página de inicio con botón para comenzar.
+    """
+    user = request.user
+    today = timezone.now().date()
+    
+    # Buscar sesión activa de hoy
+    session = VisionRushSession.objects.filter(
+        user=user,
+        date=today
+    ).first()
+    
+    if session and session.is_active:
+        # Redirigir al ejercicio actual
+        return redirect("vision_rush_puzzle")
+    
+    # Si hay sesión pero no activa (completada), mostrar resultados
+    completed_session = session if session and not session.is_active else None
+    
+    context = {
+        "has_active_session": session and session.is_active,
+        "completed_session": completed_session,
+    }
+    return render(request, "vision_rush_start.html", context)
+
+
+@login_required
+def vision_rush_new(request):
+    """
+    Crea una nueva sesión de Vision Rush para hoy.
+    """
+    user = request.user
+    today = timezone.now().date()
+    
+    # Verificar que no exista una sesión activa
+    existing = VisionRushSession.objects.filter(
+        user=user,
+        date=today
+    ).first()
+    if existing:
+        if existing.is_active:
+            return redirect("vision_rush_puzzle")
+        else:
+            # Si ya existe pero está completada, podemos crear una nueva? 
+            # Según reglas, solo una por día. Podemos redirigir a resultados.
+            return redirect("vision_rush_results", session_id=existing.id)
+    
+    # Seleccionar ejercicios
+    exercises = select_vision_rush_exercises(user)
+    
+    # Crear sesión
+    session = VisionRushSession.objects.create(
+        user=user,
+        date=today,
+        exercises=exercises,
+        failures=0,
+        completed=False,
+        score=0,
+    )
+    
+    # Redirigir al primer ejercicio
+    return redirect("vision_rush_puzzle")
+
+
+@login_required
+def vision_rush_puzzle(request):
+    """
+    Muestra el ejercicio actual de la sesión activa.
+    """
+    user = request.user
+    today = timezone.now().date()
+    
+    session = VisionRushSession.objects.filter(
+        user=user,
+        date=today,
+        completed=False
+    ).first()
+    
+    if not session:
+        # No hay sesión hoy, redirigir a inicio
+        return redirect("vision_rush_start")
+    if not session.is_active:
+        # Sesión existente pero no activa (completada), mostrar resultados
+        return redirect("vision_rush_results", session_id=session.id)
+    
+    current_index = session.current_exercise_index
+    if current_index >= len(session.exercises):
+        # Todos los ejercicios completados
+        session.completed = True
+        session.save()
+        return redirect("vision_rush_results", session_id=session.id)
+    
+    exercise = session.exercises[current_index]
+    
+    # Extraer turno del FEN (segundo campo: "w" o "b")
+    fen_parts = exercise["fen"].split()
+    turn = fen_parts[1] if len(fen_parts) > 1 else "w"
+    
+    context = {
+        "session": session,
+        "exercise": exercise,
+        "current_exercise": current_index + 1,
+        "total_exercises": len(session.exercises),
+        "failures": session.failures,
+        "turn": turn,
+    }
+    return render(request, "vision_rush_puzzle.html", context)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def vision_rush_submit(request):
+    """
+    Procesa el resultado del ejercicio actual.
+    """
+    user = request.user
+    data = json.loads(request.body)
+    
+    user_answer = data.get("user_answer")
+    solved = bool(data.get("solved"))
+    memorization_time = data.get("memorization_time")
+    response_time = data.get("response_time")
+    
+    # Convertir tiempos a float si existen
+    if memorization_time is not None:
+        try:
+            memorization_time = float(memorization_time)
+        except (ValueError, TypeError):
+            memorization_time = None
+    if response_time is not None:
+        try:
+            response_time = float(response_time)
+        except (ValueError, TypeError):
+            response_time = None
+    
+    today = timezone.now().date()
+    session = VisionRushSession.objects.filter(
+        user=user,
+        date=today,
+        completed=False
+    ).select_for_update().first()
+    
+    if not session:
+        return JsonResponse(
+            {"status": "error", "message": "No active session"},
+            status=400
+        )
+    
+    # Verificar que el índice coincida
+    current_index = session.current_exercise_index
+    if current_index >= len(session.exercises):
+        return JsonResponse(
+            {"status": "error", "message": "Session already completed"},
+            status=400
+        )
+    
+    exercise = session.exercises[current_index]
+    
+    # Registrar intento
+    attempt_data = {
+        'session': session,
+        'exercise_data': exercise,
+        'user_answer': user_answer,
+        'solved': solved,
+    }
+    if memorization_time is not None:
+        attempt_data['memorization_time'] = memorization_time
+    if response_time is not None:
+        attempt_data['response_time'] = response_time
+    
+    VisionRushAttempt.objects.create(**attempt_data)
+    
+    # Actualizar sesión
+    if solved:
+        session.record_success()
+    else:
+        session.record_failure()
+    
+    # Verificar si la sesión sigue activa
+    if not session.is_active:
+        session.completed = True
+        session.save()
+    
+    return JsonResponse({
+        "status": "ok",
+        "session_status": {
+            "completed": session.completed,
+            "is_active": session.is_active,
+            "score": session.score,
+            "failures": session.failures,
+            "current_exercise_index": session.current_exercise_index,
+        }
+    })
+
+
+@login_required
+def vision_rush_results(request, session_id):
+    """
+    Muestra los resultados de una sesión completada.
+    """
+    session = get_object_or_404(
+        VisionRushSession,
+        id=session_id,
+        user=request.user
+    )
+    
+    attempts = session.attempts.order_by("created_at")
+    
+    # Calcular promedios de tiempos (ignorando nulls)
+    from django.db.models import Avg
+    avg_memorization = attempts.exclude(memorization_time__isnull=True).aggregate(
+        avg=Avg('memorization_time')
+    )['avg']
+    avg_response = attempts.exclude(response_time__isnull=True).aggregate(
+        avg=Avg('response_time')
+    )['avg']
+    
+    context = {
+        "session": session,
+        "attempts": attempts,
+        "avg_memorization": avg_memorization,
+        "avg_response": avg_response,
+    }
+    return render(request, "vision_rush_results.html", context)
+
+
+@login_required
+def vision_rush_history(request):
+    """
+    Historial de sesiones de Vision Rush del usuario.
+    """
+    sessions = VisionRushSession.objects.filter(
+        user=request.user
+    ).order_by("-date")
+    
+    context = {
+        "sessions": sessions,
+    }
+    return render(request, "vision_rush_history.html", context)

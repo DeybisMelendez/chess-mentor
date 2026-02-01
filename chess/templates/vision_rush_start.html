@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Vision Rush | Chess Mentor{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Vision Rush</h2>
+        <p>Modo de entrenamiento para mejorar la visualización en ajedrez</p>
+    </header>
+    
+    <div class="grid">
+        <div>
+            <h3>Reglas</h3>
+            <ul>
+                <li><strong>15 ejercicios</strong> de visualización por día</li>
+                <li><strong>Sin límite de tiempo</strong> por ejercicio</li>
+                <li><strong>3 fallos</strong> y el entrenamiento termina</li>
+                <li>Posiciones aleatorias con 5 a 10 piezas</li>
+                <li>Preguntas sobre conteo de piezas, jaques, capturas, movimientos legales y ubicación de piezas</li>
+                <li>No afecta tu rating Elo</li>
+                <li>Un intento por día</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>Tu sesión de hoy</h3>
+            {% if has_active_session %}
+                <p>Tienes una sesión activa. Puedes continuar donde la dejaste.</p>
+                <a href="{% url 'vision_rush_puzzle' %}" role="button">Continuar sesión</a>
+            {% elif completed_session %}
+                <p>Ya completaste tu sesión de hoy.</p>
+                <p><strong>Resultado:</strong> {{ completed_session.score }} ejercicios resueltos</p>
+                <p><strong>Fallos:</strong> {{ completed_session.failures }}</p>
+                <a href="{% url 'vision_rush_results' completed_session.id %}" role="button">Ver detalles</a>
+            {% else %}
+                <p>Aún no has realizado tu sesión de hoy.</p>
+                <a href="{% url 'vision_rush_new' %}" role="button">Comenzar nueva sesión</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="margin-top-2">
+        <h3>Historial</h3>
+        <p>Revisa tus sesiones anteriores.</p>
+        <a href="{% url 'vision_rush_history' %}" role="button">Ver historial</a>
+    </div>
+</article>
+{% endblock %}
