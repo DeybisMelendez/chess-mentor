@@ -13,20 +13,28 @@ urlpatterns = [
     path("puzzle/submit/", views.submit_puzzle, name="submit_puzzle"),
     path("history/", views.puzzle_history, name="puzzle_history"),
     path("themes/", views.theme_overview, name="theme_overview"),
-    
+
     # Blitz Tactics
     path("blitz-tactics/", views.blitz_tactics_start, name="blitz_tactics_start"),
     path("blitz-tactics/new/", views.blitz_tactics_new, name="blitz_tactics_new"),
-    path("blitz-tactics/puzzle/", views.blitz_tactics_puzzle, name="blitz_tactics_puzzle"),
-    path("blitz-tactics/submit/", views.blitz_tactics_submit, name="blitz_tactics_submit"),
-    path("blitz-tactics/results/<int:session_id>/", views.blitz_tactics_results, name="blitz_tactics_results"),
-    path("blitz-tactics/history/", views.blitz_tactics_history, name="blitz_tactics_history"),
-    
+    path("blitz-tactics/puzzle/", views.blitz_tactics_puzzle,
+         name="blitz_tactics_puzzle"),
+    path("blitz-tactics/submit/", views.blitz_tactics_submit,
+         name="blitz_tactics_submit"),
+    path("blitz-tactics/results/<int:session_id>/",
+         views.blitz_tactics_results, name="blitz_tactics_results"),
+    path("blitz-tactics/history/", views.blitz_tactics_history,
+         name="blitz_tactics_history"),
+
     # Vision Rush
     path("vision-rush/", views.vision_rush_start, name="vision_rush_start"),
     path("vision-rush/new/", views.vision_rush_new, name="vision_rush_new"),
-    path("vision-rush/puzzle/", views.vision_rush_puzzle, name="vision_rush_puzzle"),
-    path("vision-rush/submit/", views.vision_rush_submit, name="vision_rush_submit"),
-    path("vision-rush/results/<int:session_id>/", views.vision_rush_results, name="vision_rush_results"),
-    path("vision-rush/history/", views.vision_rush_history, name="vision_rush_history"),
+    path("vision-rush/puzzle/", views.vision_rush_puzzle,
+         name="vision_rush_puzzle"),
+    path("vision-rush/submit/", views.vision_rush_submit,
+         name="vision_rush_submit"),
+    path("vision-rush/results/<int:session_id>/",
+         views.vision_rush_results, name="vision_rush_results"),
+    path("vision-rush/history/", views.vision_rush_history,
+         name="vision_rush_history"),
 ]
