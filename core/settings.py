@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    "chess",
+    "chess_mentor",
 ]
 
 MIDDLEWARE = [

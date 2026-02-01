@@ -3,7 +3,8 @@ from django.apps import AppConfig
 
 class ChessConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'chess'
+    name = 'chess_mentor'
+    label = 'chess'
 
     def ready(self):
-        import chess.signals
+        import chess_mentor.signals

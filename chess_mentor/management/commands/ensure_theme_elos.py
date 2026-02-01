@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 
-from chess.models import Theme
-from chess.models import ThemeElo
+from chess_mentor.models import Theme
+from chess_mentor.models import ThemeElo
 
 
 class Command(BaseCommand):
