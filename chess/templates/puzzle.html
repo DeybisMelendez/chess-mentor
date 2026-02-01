@@ -66,6 +66,8 @@
     </div>
 </article>
 
+{{ puzzle.moves|json_script:"solution-data" }}
+
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -77,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const PUZZLE_ID = "{{ puzzle.puzzle_id }}";
         const SUBMIT_URL = "{% url 'submit_puzzle' %}";
         const CSRF_TOKEN = "{{ csrf_token }}";
-        const SOLUTION = {{ puzzle.moves|safe }};
+        const SOLUTION = JSON.parse(document.getElementById('solution-data').textContent);
         const FEN = "{{ puzzle.fen|escapejs }}";
 
         /* =======================

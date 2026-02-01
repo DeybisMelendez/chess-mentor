@@ -111,6 +111,26 @@
     </table>
 </div>
 
+{% if page_obj %}
+<nav class="pagination" style="display: flex; justify-content: center; margin-top: 2rem;">
+    <ul style="display: flex; list-style: none; gap: 0.5rem;">
+        {% if page_obj.has_previous %}
+            <li><a href="?cycle={{ selected_cycle.id }}&page={{ page_obj.previous_page_number }}">« Anterior</a></li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li><strong>{{ num }}</strong></li>
+            {% else %}
+                <li><a href="?cycle={{ selected_cycle.id }}&page={{ num }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+            <li><a href="?cycle={{ selected_cycle.id }}&page={{ page_obj.next_page_number }}">Siguiente »</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 {% endif %}
 
 

@@ -1,9 +1,12 @@
+import logging
 import random
 import sqlite3
 import zlib
 from pathlib import Path
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 class LichessDB:
@@ -84,8 +87,7 @@ class LichessDB:
                     cursor.execute(f"CREATE INDEX {idx_name} ON {idx_def}")
                 except Exception as e:
                     # Log error pero continuar
-                    import sys
-                    print(f"Warning: Could not create index {idx_name}: {e}", file=sys.stderr)
+                    logger.warning(f"Could not create index {idx_name}: {e}")
         
         conn.commit()
         self.__class__._indexes_created = True
@@ -94,8 +96,9 @@ class LichessDB:
         """Descomprime FEN almacenado como BLOB comprimido."""
         try:
             return zlib.decompress(fen_compressed).decode('utf-8')
-        except:
+        except Exception as e:
             # Si falla, asumir que ya es string (backwards compatibility)
+            logger.debug(f"Decompression failed for FEN: {e}")
             if isinstance(fen_compressed, bytes):
                 return fen_compressed.decode('utf-8', errors='ignore')
             return fen_compressed
@@ -104,8 +107,9 @@ class LichessDB:
         """Descomprime moves almacenado como BLOB comprimido."""
         try:
             return zlib.decompress(moves_compressed).decode('utf-8')
-        except:
+        except Exception as e:
             # Si falla, asumir que ya es string (backwards compatibility)
+            logger.debug(f"Decompression failed for moves: {e}")
             if isinstance(moves_compressed, bytes):
                 return moves_compressed.decode('utf-8', errors='ignore')
             return moves_compressed

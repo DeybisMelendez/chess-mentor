@@ -1,12 +1,13 @@
 import json
 import random
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum, Avg
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.core.paginator import Paginator
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.views.decorators.http import require_POST
@@ -205,6 +206,12 @@ def submit_puzzle(request):
     db = LichessDB()
     puzzle_data = db.get_puzzle_by_id(puzzle_id)
 
+    if not puzzle_data:
+        return JsonResponse(
+            {"status": "error", "message": "Puzzle not found"},
+            status=404,
+        )
+
     puzzle_rating = puzzle_data["rating"]
     puzzle_themes = puzzle_data["themes"]
     score = 1.0 if solved else 0.0
@@ -309,6 +316,99 @@ def home(request):
         for te in category_elos
     }
 
+    # =====================================================
+    # Estadísticas generales de puzzles
+    # =====================================================
+    puzzle_stats = PuzzleAttempt.objects.filter(user=user).aggregate(
+        total=Count('id'),
+        solved_count=Count('id', filter=Q(solved=True)),
+        failed_count=Count('id', filter=Q(solved=False)),
+    )
+    
+    total_puzzles = puzzle_stats['total'] or 0
+    solved_puzzles = puzzle_stats['solved_count'] or 0
+    failed_puzzles = puzzle_stats['failed_count'] or 0
+    
+    success_rate = 0
+    if total_puzzles > 0:
+        success_rate = round((solved_puzzles / total_puzzles) * 100, 1)
+
+    # =====================================================
+    # Progreso semanal (últimos 7 días)
+    # =====================================================
+    week_ago = today - timedelta(days=7)
+    weekly_stats = PuzzleAttempt.objects.filter(
+        user=user,
+        created_at__date__gte=week_ago,
+        created_at__date__lte=today
+    ).aggregate(
+        weekly_total=Count('id'),
+        weekly_solved_count=Count('id', filter=Q(solved=True)),
+    )
+    
+    weekly_total = weekly_stats['weekly_total'] or 0
+    weekly_solved = weekly_stats['weekly_solved_count'] or 0
+    
+    weekly_success_rate = 0
+    if weekly_total > 0:
+        weekly_success_rate = round((weekly_solved / weekly_total) * 100, 1)
+
+    # =====================================================
+    # Temas más débiles y más fuertes
+    # =====================================================
+    # Temas más débiles (menor Elo)
+    weakest_themes = ThemeElo.objects.filter(
+        user=user,
+        theme__is_trainable=True
+    ).select_related("theme").order_by("elo", "theme__name")[:5]
+    
+    # Temas más fuertes (mayor Elo)
+    strongest_themes = ThemeElo.objects.filter(
+        user=user,
+        theme__is_trainable=True
+    ).select_related("theme").order_by("-elo", "theme__name")[:5]
+
+    # =====================================================
+    # Progreso diario en el ciclo actual
+    # =====================================================
+    # Contar puzzles por día en el ciclo actual
+    daily_progress = []
+    if cycle:
+        cycle_start = cycle.start_date
+        cycle_end = cycle.end_date
+        
+        # Para simplificar, contamos puzzles por día en el ciclo
+        daily_counts = PuzzleAttempt.objects.filter(
+            user=user,
+            created_at__date__gte=cycle_start,
+            created_at__date__lte=cycle_end
+        ).values('created_at__date').annotate(
+            daily_total=Count('id'),
+            daily_solved=Count('id', filter=Q(solved=True))
+        ).order_by('created_at__date')
+        
+        for day in daily_counts:
+            daily_progress.append({
+                'date': day['created_at__date'],
+                'total': day['daily_total'],
+                'solved': day['daily_solved'],
+                'failed': day['daily_total'] - day['daily_solved']
+            })
+
+    # =====================================================
+    # Cálculo de días restantes en el ciclo
+    # =====================================================
+    days_remaining = (cycle.end_date - today).days
+    if days_remaining < 0:
+        days_remaining = 0
+
+    # =====================================================
+    # Progreso del ciclo (porcentaje)
+    # =====================================================
+    cycle_progress_percent = 0
+    if cycle.total_puzzles > 0:
+        cycle_progress_percent = round((cycle.completed_puzzles / cycle.total_puzzles) * 100, 1)
+
     context = {
         "cycle": cycle,
         "elo": user_elo,
@@ -317,6 +417,26 @@ def home(request):
         "endgame": elo_map.get("endgame"),
         "mate": elo_map.get("mate"),
         "cycle_themes": cycle_themes,
+        
+        # Estadísticas generales
+        "total_puzzles": total_puzzles,
+        "solved_puzzles": solved_puzzles,
+        "failed_puzzles": failed_puzzles,
+        "success_rate": success_rate,
+        
+        # Estadísticas semanales
+        "weekly_total": weekly_total,
+        "weekly_solved": weekly_solved,
+        "weekly_success_rate": weekly_success_rate,
+        
+        # Temas
+        "weakest_themes": weakest_themes,
+        "strongest_themes": strongest_themes,
+        
+        # Progreso del ciclo
+        "days_remaining": days_remaining,
+        "cycle_progress_percent": cycle_progress_percent,
+        "daily_progress": daily_progress,
     }
 
     return render(request, "home.html", context)
@@ -365,6 +485,14 @@ def puzzle_history(request):
         solved_count = attempts.filter(solved=True).count()
         failed_count = total_count - solved_count
 
+        # Paginación
+        paginator = Paginator(attempts, 50)
+        page_number = request.GET.get('page', 1)
+        page_obj = paginator.get_page(page_number)
+        attempts = page_obj.object_list
+    else:
+        page_obj = None
+
     context = {
         "cycles": cycles,
         "selected_cycle": selected_cycle,
@@ -372,6 +500,7 @@ def puzzle_history(request):
         "solved_count": solved_count,
         "failed_count": failed_count,
         "total_count": total_count,
+        "page_obj": page_obj,
     }
 
     return render(request, "puzzle_history.html", context)
