@@ -87,6 +87,8 @@ class Command(BaseCommand):
 
         # Mapear cada tema a su categoría padre
         theme_to_parent = {}
+        category_counts = {"endgame": 0, "mate": 0, "opening": 0, "middlegame": 0}
+        
         for theme_name in lichess_theme_names:
             if theme_name in ["opening", "middlegame", "endgame", "mate"]:
                 # Estos son categorías padre, no temas entrenables
@@ -100,6 +102,8 @@ class Command(BaseCommand):
                 parent_name = "endgame"
             elif theme_name.startswith("mateIn"):
                 parent_name = "mate"
+            elif "Mate" in theme_name:
+                parent_name = "mate"
             elif theme_name == "opening":
                 parent_name = "opening"
             else:
@@ -107,6 +111,9 @@ class Command(BaseCommand):
                 parent_name = "middlegame"
             
             theme_to_parent[theme_name] = parent_by_lichess_name.get(parent_name)
+            category_counts[parent_name] += 1
+        
+        self.stdout.write(f"Distribución de temas entrenables: {category_counts}")
 
         # Sincronizar temas entrenables
         created = 0
