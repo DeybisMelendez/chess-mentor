@@ -11,10 +11,11 @@ SQLITE_FILE = "lichess_puzzles.sqlite3"
 
 # Filtros simplificados
 # Máxima desviación permitida (menor = más estable)
-RATING_DEVIATION_THRESHOLD = 150
-RATING_MIN = 1500                  # Rating mínimo (Elo)
-RATING_MAX = 2800                  # Rating máximo (Elo)
-MAX_TOTAL_PUZZLES = 700000
+RATING_DEVIATION_THRESHOLD = 120
+RATING_MIN = 700                  # Rating mínimo (Elo)
+RATING_MAX = 3000                  # Rating máximo (Elo)
+MAX_TOTAL_PUZZLES = 500_000
+MAX_PUZZLES_PER_THEME = 10000      # Máximo de puzzles por tema
 BATCH_SIZE = 10000                 # Lotes para importación
 
 
@@ -93,11 +94,13 @@ def convert_csv_to_sqlite():
     # Optimizar SQLite para importación masiva y mínimo tamaño
     cursor.execute("PRAGMA journal_mode=OFF")
     cursor.execute("PRAGMA synchronous=OFF")
-    cursor.execute("PRAGMA cache_size=-20000")  # 20MB cache (consistente con runtime)
+    # 20MB cache (consistente con runtime)
+    cursor.execute("PRAGMA cache_size=-20000")
     cursor.execute("PRAGMA temp_store=MEMORY")
     cursor.execute("PRAGMA locking_mode=EXCLUSIVE")
     cursor.execute("PRAGMA page_size=4096")
-    cursor.execute("PRAGMA foreign_keys=OFF")  # Desactivar FK durante importación
+    # Desactivar FK durante importación
+    cursor.execute("PRAGMA foreign_keys=OFF")
     cursor.execute("PRAGMA automatic_index=OFF")  # Evitar índices automáticos
     cursor.execute("PRAGMA ignore_check_constraints=ON")
 
@@ -109,6 +112,7 @@ def convert_csv_to_sqlite():
     total = 0
     skipped = 0
     ignored = 0
+    limited_by_theme = 0
 
     with open(csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -140,26 +144,32 @@ def convert_csv_to_sqlite():
             # themes.update(row["OpeningTags"].split())
 
             # Filtrar temas no deseados (muy raros o irrelevantes)
-            # Lista de temas principales de ajedrez
+            # Lista de temas principales de ajedrez - temas útiles para entrenamiento
             CHESS_THEMES = {
-                # Temas estratégicos
-                "middlegame", "endgame", "opening",
-                # Tácticos
-                "mate", "mateIn1", "mateIn2", "mateIn3", "mateIn4", "mateIn5",
+                # Tácticos comunes
                 "fork", "pin", "skewer", "discoveredAttack", "doubleCheck",
                 "deflection", "decoy", "interference", "zugzwang",
                 "sacrifice", "clearance", "xRayAttack", "windmill",
-                # Patrones
-                "kingsideAttack", "queensideAttack", "backRankMate",
-                "smotheredMate", "arabianMate", "hookMate",
                 "annihilation", "capturingDefender", "hangingPiece",
+                "attraction", "discoveredCheck", "intermezzo", "quietMove",
+                "defensiveMove", "advancedPawn", "promotion", "enPassant",
+                "castling", "underPromotion", "trappedPiece", "exposedKing",
+                "attackingF2F7",
+
+                # Patrones de mate
+                "backRankMate", "smotheredMate", "arabianMate", "hookMate",
+                "pillsburysMate", "operaMate", "cornerMate", "anastasiaMate",
+                "morphysMate", "triangleMate", "blindSwineMate", "killBoxMate",
+                "dovetailMate", "bodenMate", "doubleBishopMate", "vukovicMate",
+                "balestraMate",
+
+                # Ataque posicional
+                "kingsideAttack", "queensideAttack",
+
                 # Finales
                 "pawnEndgame", "rookEndgame", "bishopEndgame", "knightEndgame",
-                "queenEndgame", "bishopPair", "oppositeColoredBishops",
-                "sameColoredBishops",
-                # Estratégicos
-                "advantage", "crushing", "equality", "short",
-                "veryLong", "master", "masterVsMaster", "superGM",
+                "queenEndgame", "queenRookEndgame", "bishopPair",
+                "oppositeColoredBishops", "sameColoredBishops",
             }
 
             # Filtrar solo temas conocidos para reducir cantidad de temas únicos
@@ -168,6 +178,18 @@ def convert_csv_to_sqlite():
             # Si después de filtrar no hay temas, omitir puzzle
             if not themes:
                 ignored += 1
+                continue
+
+            # Filtrar temas que no han alcanzado el límite máximo por tema
+            valid_themes = []
+            for theme in themes:
+                if theme_counter[theme] < MAX_PUZZLES_PER_THEME:
+                    valid_themes.append(theme)
+                # else: tema ya alcanzó el límite, no se incluye
+
+            # Si no hay temas válidos después del filtro por límite, omitir puzzle
+            if not valid_themes:
+                limited_by_theme += 1
                 continue
 
             # Insertar puzzle (sin límites por tema/bucket)
@@ -195,8 +217,8 @@ def convert_csv_to_sqlite():
             # -----------------------------
             # Asociar temas
             # -----------------------------
-            for theme in themes:
-                # Total
+            for theme in valid_themes:
+                # Incrementar contador para este tema
                 theme_counter[theme] += 1
 
                 theme_id = get_or_create_theme(cursor, theme)
@@ -250,10 +272,8 @@ def convert_csv_to_sqlite():
     print(f"Puzzles descartados por rating deviation: {skipped}")
     print(
         f"Puzzles fuera de rango rating ({RATING_MIN}-{RATING_MAX}): {ignored}")
-
-    print("\n--- Resumen por tema ---")
-    for theme, count in sorted(theme_counter.items(), key=lambda x: x[1], reverse=True):
-        print(f"{theme:30} -> {count}")
+    print(
+        f"Puzzles descartados por límite de tema ({MAX_PUZZLES_PER_THEME} por tema): {limited_by_theme}")
 
     print("\n--- Resumen por tema ---")
     for theme, count in sorted(theme_counter.items(), key=lambda x: x[1], reverse=True):
