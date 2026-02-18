@@ -415,11 +415,11 @@ def home(request):
     # Progreso de Blitz Tactics en el ciclo actual
     # =====================================================
     blitz_target = 5
-    blitz_completed = BlitzTacticsAttempt.objects.filter(
-        session__user=user,
-        session__date__gte=cycle.start_date,
-        session__date__lte=cycle.end_date,
-        solved=True
+    blitz_completed = BlitzTacticsSession.objects.filter(
+        user=user,
+        date__gte=cycle.start_date,
+        date__lte=cycle.end_date,
+        completed=True
     ).count()
     blitz_progress_percent = round((blitz_completed / blitz_target) * 100, 1) if blitz_target > 0 else 0
     if blitz_progress_percent > 100:
@@ -429,11 +429,11 @@ def home(request):
     # Progreso de Vision Rush en el ciclo actual
     # =====================================================
     vision_target = 5
-    vision_completed = VisionRushAttempt.objects.filter(
-        session__user=user,
-        session__date__gte=cycle.start_date,
-        session__date__lte=cycle.end_date,
-        solved=True
+    vision_completed = VisionRushSession.objects.filter(
+        user=user,
+        date__gte=cycle.start_date,
+        date__lte=cycle.end_date,
+        completed=True
     ).count()
     vision_progress_percent = round((vision_completed / vision_target) * 100, 1) if vision_target > 0 else 0
     if vision_progress_percent > 100:
@@ -890,6 +890,65 @@ def blitz_tactics_submit(request):
         solved=solved,
         time_taken=time_taken
     )
+    
+    # Actualizar Elo general y por temas (igual que en entrenamiento principal)
+    db = LichessDB()
+    puzzle_data = db.get_puzzle_by_id(puzzle_id)
+    
+    if puzzle_data:
+        puzzle_rating = puzzle_data["rating"]
+        puzzle_themes = puzzle_data["themes"]
+        score = 1.0 if solved else 0.0
+        
+        # Actualizar Elo general
+        user_elo = Elo.objects.select_for_update().get(user=user)
+        user_elo.update_elo(
+            opponent_elo=puzzle_rating,
+            score=score,
+        )
+        
+        # Actualizar Elo por tema
+        themes = Theme.objects.filter(
+            lichess_name__in=puzzle_themes
+        )
+        
+        theme_elos = {
+            te.theme_id: te
+            for te in ThemeElo.objects.filter(
+                user=user,
+                theme__in=themes
+            ).select_for_update()
+        }
+        
+        for theme in themes:
+            theme_elo = theme_elos.get(theme.id)
+            if not theme_elo:
+                continue  # por seguridad extrema
+            
+            theme_elo.update_elo(
+                opponent_elo=puzzle_rating,
+                score=score,
+            )
+    
+    # Registrar en PuzzleAttempt para historial general
+    PuzzleAttempt.objects.create(
+        user=user,
+        puzzle_id=puzzle_id,
+        solved=solved,
+    )
+    
+    # Actualizar RetryPuzzle (para que aparezca en entrenamiento principal)
+    if solved:
+        RetryPuzzle.objects.filter(
+            user=user,
+            puzzle_id=puzzle_id,
+        ).delete()
+    else:
+        RetryPuzzle.objects.update_or_create(
+            user=user,
+            puzzle_id=puzzle_id,
+            defaults={"fail_count": 1},
+        )
     
     # Actualizar sesión
     if solved:
