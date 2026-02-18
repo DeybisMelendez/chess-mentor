@@ -23,6 +23,65 @@
     </label>
 </form>
 
+{% if not selected_cycle and cycles_with_stats %}
+<h3>Resumen de ciclos de entrenamiento</h3>
+<div class="overflow-x-auto">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Ciclo</th>
+                <th>Puzzles</th>
+                <th>Blitz Tactics</th>
+                <th>Vision Rush</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stats in cycles_with_stats %}
+                <tr>
+                    <td>
+                        <strong>{{ stats.cycle.start_date }} → {{ stats.cycle.end_date }}</strong><br>
+                        <small>{{ stats.cycle.completed_puzzles }}/{{ stats.cycle.total_puzzles }} completados</small>
+                    </td>
+                    <td>
+                        {% if stats.puzzles.total > 0 %}
+                            {{ stats.puzzles.solved }}/{{ stats.puzzles.total }}<br>
+                            <small>{{ stats.puzzles.percentage|floatformat:1 }}%</small>
+                        {% else %}
+                            <small>Sin datos</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if stats.blitz_tactics.sessions > 0 %}
+                            {{ stats.blitz_tactics.solved }}/{{ stats.blitz_tactics.attempted }}<br>
+                            <small>{{ stats.blitz_tactics.percentage|floatformat:1 }}% ({{ stats.blitz_tactics.sessions }} sesión{{ stats.blitz_tactics.sessions|pluralize:"es" }})</small>
+                        {% else %}
+                            <small>Sin sesiones</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if stats.vision_rush.sessions > 0 %}
+                            {{ stats.vision_rush.solved }}/{{ stats.vision_rush.attempted }}<br>
+                            <small>{{ stats.vision_rush.percentage|floatformat:1 }}% ({{ stats.vision_rush.sessions }} sesión{{ stats.vision_rush.sessions|pluralize:"es" }})</small>
+                        {% else %}
+                            <small>Sin sesiones</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-links">
+                            <a href="?cycle={{ stats.cycle.id }}" class="button-link small">Ver puzzles</a>
+                            <a href="{% url 'blitz_tactics_history' %}?cycle={{ stats.cycle.id }}" class="button-link small">Ver Blitz Tactics</a>
+                            <a href="{% url 'vision_rush_history' %}?cycle={{ stats.cycle.id }}" class="button-link small">Ver Vision Rush</a>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<hr>
+{% endif %}
+
 {% if selected_cycle %}
 
 <hr>
@@ -31,6 +90,12 @@
     <h3>
         Ciclo {{ selected_cycle.start_date }} → {{ selected_cycle.end_date }}
     </h3>
+    
+    <div class="mode-navigation">
+        <a href="?cycle={{ selected_cycle.id }}" class="button-link small active">Puzzles</a>
+        <a href="{% url 'blitz_tactics_history' %}?cycle={{ selected_cycle.id }}" class="button-link small">Blitz Tactics</a>
+        <a href="{% url 'vision_rush_history' %}?cycle={{ selected_cycle.id }}" class="button-link small">Vision Rush</a>
+    </div>
 
         <div class="stats-container">
             <div class="stat-box">
@@ -67,10 +132,40 @@
                 <div class="stat-box__value">{{ selected_cycle.completed_puzzles }}/{{ selected_cycle.total_puzzles }}</div>
                 <progress value="{{ selected_cycle.completed_puzzles }}" max="{{ selected_cycle.total_puzzles }}" class="width-100 margin-top-05 progress-bar--cycle"></progress>
             </div>
+            
+            {% if blitz_stats %}
+            <div class="stat-box stat-box--solved">
+                <div class="stat-box__label">Blitz Tactics</div>
+                <div class="stat-box__value">{{ blitz_stats.solved }}/{{ blitz_stats.attempted }}</div>
+                <div class="stat-box__percentage">
+                    {% if blitz_stats.attempted > 0 %}
+                        {{ blitz_stats.percentage|floatformat:1 }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+                <div class="stat-box__subtext">{{ blitz_stats.sessions }} sesión{{ blitz_stats.sessions|pluralize:"es" }}</div>
+            </div>
+            {% endif %}
+            
+            {% if vision_stats %}
+            <div class="stat-box stat-box--solved">
+                <div class="stat-box__label">Vision Rush</div>
+                <div class="stat-box__value">{{ vision_stats.solved }}/{{ vision_stats.attempted }}</div>
+                <div class="stat-box__percentage">
+                    {% if vision_stats.attempted > 0 %}
+                        {{ vision_stats.percentage|floatformat:1 }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+                <div class="stat-box__subtext">{{ vision_stats.sessions }} sesión{{ vision_stats.sessions|pluralize:"es" }}</div>
+            </div>
+            {% endif %}
         </div>
 </div>
 
-<div style="overflow-x: auto;">
+<div class="overflow-x-auto">
     <table class="data-table">
         <thead>
             <tr>
@@ -112,8 +207,8 @@
 </div>
 
 {% if page_obj %}
-<nav class="pagination" style="display: flex; justify-content: center; margin-top: 2rem;">
-    <ul style="display: flex; list-style: none; gap: 0.5rem;">
+<nav class="pagination pagination-container">
+    <ul class="pagination-list">
         {% if page_obj.has_previous %}
             <li><a href="?cycle={{ selected_cycle.id }}&page={{ page_obj.previous_page_number }}">« Anterior</a></li>
         {% endif %}

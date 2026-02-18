@@ -8,6 +8,51 @@
         <p>Tus sesiones anteriores</p>
     </header>
     
+    <form method="get">
+        <label>
+            Seleccionar ciclo:
+            <select name="cycle" onchange="this.form.submit()">
+                <option value="">-- Todos los ciclos --</option>
+                {% for cycle in cycles %}
+                    <option
+                        value="{{ cycle.id }}"
+                        {% if selected_cycle and cycle.id == selected_cycle.id %}selected{% endif %}
+                    >
+                        {{ cycle.start_date }} → {{ cycle.end_date }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+    </form>
+    
+    {% if selected_cycle %}
+        <h3>Ciclo {{ selected_cycle.start_date }} → {{ selected_cycle.end_date }}</h3>
+    {% endif %}
+    
+    {% if total_sessions > 0 %}
+        <div class="stats-container margin-bottom-1">
+            <div class="stat-box">
+                <div class="stat-box__label">Sesiones</div>
+                <div class="stat-box__value">{{ total_sessions }}</div>
+            </div>
+            <div class="stat-box stat-box--solved">
+                <div class="stat-box__label">Ejercicios resueltos</div>
+                <div class="stat-box__value">{{ total_exercises_solved }}/{{ total_exercises_attempted }}</div>
+                <div class="stat-box__percentage">
+                    {% if total_exercises_attempted > 0 %}
+                        {% widthratio total_exercises_solved total_exercises_attempted 100 %}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-box__label">Promedio por sesión</div>
+                <div class="stat-box__value">{{ avg_score|floatformat:1 }}</div>
+            </div>
+        </div>
+    {% endif %}
+    
     {% if sessions %}
         <table role="grid">
             <thead>

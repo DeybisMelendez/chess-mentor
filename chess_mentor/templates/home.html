@@ -7,23 +7,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <!-- Datos para gráficos -->
-{{ daily_progress|json_script:"dailyProgressData" }}
 {{ cycle_progress_percent|json_script:"cycleProgressPercent" }}
 {{ success_rate|json_script:"successRateData" }}
 {{ weekly_success_rate|json_script:"weeklySuccessRateData" }}
 
-<!-- Datos de categorías para gráfico radar -->
-<script id="categoryData" type="application/json">
-{
-  "labels": ["Apertura", "Medio juego", "Final", "Mate"],
-  "data": [
-    {{ opening.elo|default:0 }},
-    {{ middlegame.elo|default:0 }},
-    {{ endgame.elo|default:0 }},
-    {{ mate.elo|default:0 }}
-  ]
-}
-</script>
+{{ category_data|json_script:"categoryData" }}
 
 <header style="text-align: center; margin-bottom: 2rem;">
     <h1>Bienvenido, {{ user.username }}</h1>
@@ -33,7 +21,7 @@
 <!-- Sección de estadísticas principales -->
 <section class="grid" style="margin-bottom: 2rem;">
     <article>
-        <h3>📊 Estadísticas Globales</h3>
+        <h3>📊 Estadísticas de entrenamiento</h3>
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
             <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
                 <div style="font-size: 2rem; font-weight: bold; color: var(--pico-primary);">{{ total_puzzles }}</div>
@@ -45,11 +33,11 @@
             </div>
             <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
                 <div style="font-size: 2rem; font-weight: bold; color: var(--pico-secondary);">{{ weekly_total }}</div>
-                <div>Esta semana</div>
+                <div>Puzzles esta semana</div>
             </div>
             <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
                 <div style="font-size: 2rem; font-weight: bold; color: #2196f3;">{{ weekly_success_rate }}%</div>
-                <div>Éxito semanal</div>
+                <div>Éxito esta semana</div>
             </div>
         </div>
     </article>
@@ -58,19 +46,34 @@
 <!-- Sección de ciclo actual -->
 <section class="grid" style="margin-bottom: 2rem;">
     <article class="chart-article">
-        <h3>📅 Ciclo de entrenamiento actual</h3>
-        <p>
-            <strong>Periodo:</strong> {{ cycle.start_date }} – {{ cycle.end_date }}<br>
-            <strong>Progreso:</strong> {{ cycle.completed_puzzles }} / {{ cycle.total_puzzles }} puzzles
-            ({{ cycle_progress_percent }}%)<br>
-            <strong>Días restantes:</strong> {{ days_remaining }}<br>
-            <strong>Estado:</strong>
-            {% if cycle.completed_puzzles >= cycle.total_puzzles %}
-                <span style="color: #2e7d32;">✅ Completado</span>
-            {% else %}
-                <span style="color: #ff9800;">🔄 En progreso</span>
-            {% endif %}
-        </p>
+        <h3>📅 Ciclo actual</h3>
+        
+        <!-- Gráfico de progreso del ciclo -->
+        <div class="chart-container" style="height: 200px; margin-top: 0.5rem;">
+            <canvas id="cycleProgressChart" style="margin:auto"></canvas>
+        </div>
+        
+        <!-- Información resumida del ciclo -->
+        <div style="margin-top: 1rem; text-align: center;">
+            <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                <div>
+                    <strong>Periodo:</strong><br>
+                    {{ cycle.start_date }} – {{ cycle.end_date }}
+                </div>
+                <div>
+                    <strong>Días restantes:</strong><br>
+                    {{ days_remaining }}
+                </div>
+                <div>
+                    <strong>Estado:</strong><br>
+                    {% if cycle.completed_puzzles >= cycle.total_puzzles %}
+                        <span style="color: #2e7d32;">✅ Completado</span>
+                    {% else %}
+                        <span style="color: #ff9800;">🔄 En progreso</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
         
         <div style="margin-top: 1rem;">
             <strong>Temas del ciclo (prioridad):</strong>
@@ -85,11 +88,6 @@
             {% else %}
                 <p class="muted">No se detectan debilidades claras por ahora.</p>
             {% endif %}
-        </div>
-        
-        <!-- Gráfico de progreso del ciclo -->
-        <div class="chart-container" style="height: 200px; margin-top: 1.5rem;">
-            <canvas id="cycleProgressChart" style="margin:auto"></canvas>
         </div>
     </article>
     
@@ -117,35 +115,31 @@
     </article>
 </section>
 
-<!-- Sección de gráficos de progreso -->
+<!-- Sección de objetivos semanales -->
 <section class="grid" style="margin-bottom: 2rem;">
-    <article class="chart-article">
-        <h3>📈 Progreso diario (este ciclo)</h3>
-        <div class="chart-container chart-container-large" style="height: 250px;">
-            <canvas id="dailyProgressChart"></canvas>
-        </div>
-        {% if not daily_progress %}
-            <p class="muted">Aún no hay actividad registrada en este ciclo.</p>
-        {% endif %}
-    </article>
-    
-    <article class="chart-article">
-        <h3>🎯 Distribución de resultados</h3>
-        <div class="chart-container" style="height: 250px;">
-            <canvas id="resultsDistributionChart" style="margin:auto"></canvas>
-        </div>
-        <div style="text-align: center; margin-top: 1rem;">
-            <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 1rem;">
-                <div style="color: #2e7d32;">
-                    <strong>✅ Resueltos:</strong> {{ solved_puzzles }}
-                </div>
-                <div style="color: #c62828;">
-                    <strong>❌ Fallidos:</strong> {{ failed_puzzles }}
-                </div>
+    <article>
+        <h3>🎯 Objetivos semanales</h3>
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
+                <div style="font-size: 2rem; font-weight: bold; color: #2e7d32;">{{ cycle.completed_puzzles }} / {{ cycle.total_puzzles }}</div>
+                <div>Puzzles del ciclo</div>
+                <div style="font-size: 0.9rem; color: var(--pico-muted-color);">{{ cycle_progress_percent }}% completado</div>
+            </div>
+            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
+                <div style="font-size: 2rem; font-weight: bold; color: #2196f3;">{{ blitz_completed }} / {{ blitz_target }}</div>
+                <div>Blitz Tactics</div>
+                <div style="font-size: 0.9rem; color: var(--pico-muted-color);">{{ blitz_progress_percent }}% completado</div>
+            </div>
+            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
+                <div style="font-size: 2rem; font-weight: bold; color: #9c27b0;">{{ vision_completed }} / {{ vision_target }}</div>
+                <div>Vision Rush</div>
+                <div style="font-size: 0.9rem; color: var(--pico-muted-color);">{{ vision_progress_percent }}% completado</div>
             </div>
         </div>
     </article>
 </section>
+
+
 
 <!-- Sección de temas -->
 <section class="grid" style="margin-bottom: 2rem;">
@@ -264,92 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // =====================================================
-    // 3. Gráfico de progreso diario (barras)
-    // =====================================================
-    const dailyProgressData = JSON.parse(document.getElementById('dailyProgressData').textContent);
-    const dailyProgressCtx = document.getElementById('dailyProgressChart').getContext('2d');
-    
-    if (dailyProgressData.length > 0) {
-        const dates = dailyProgressData.map(d => new Date(d.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }));
-        const solvedData = dailyProgressData.map(d => d.solved);
-        const failedData = dailyProgressData.map(d => d.failed);
-        
-        new Chart(dailyProgressCtx, {
-            type: 'bar',
-            data: {
-                labels: dates,
-                datasets: [
-                    {
-                        label: 'Resueltos',
-                        data: solvedData,
-                        backgroundColor: '#2e7d32',
-                        borderColor: '#2e7d32',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Fallidos',
-                        data: failedData,
-                        backgroundColor: '#c62828',
-                        borderColor: '#c62828',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
-                        stacked: false,
-                        grid: { display: false }
-                    },
-                    y: {
-                        stacked: false,
-                        beginAtZero: true,
-                        ticks: { stepSize: 1 }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    }
-                }
-            }
-        });
-    }
 
-    // =====================================================
-    // 4. Gráfico de distribución de resultados (dona)
-    // =====================================================
-    const successRate = JSON.parse(document.getElementById('successRateData').textContent);
-    const resultsDistributionCtx = document.getElementById('resultsDistributionChart').getContext('2d');
-    new Chart(resultsDistributionCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Resueltos', 'Fallidos'],
-            datasets: [{
-                data: [successRate, 100 - successRate],
-                backgroundColor: ['#2e7d32', '#c62828'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            cutout: '60%',
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.label + ': ' + context.parsed + '%';
-                        }
-                    }
-                }
-            }
-        }
-    });
 });
 </script>
 

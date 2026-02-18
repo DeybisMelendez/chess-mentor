@@ -91,8 +91,7 @@ def get_weakest_themes(user, limit=10):
     """
     from .models import ThemeElo
     weakest = ThemeElo.objects.filter(
-        user=user,
-        theme__is_trainable=True
+        user=user
     ).order_by("elo")[:limit]
     return [wt.theme for wt in weakest]
 

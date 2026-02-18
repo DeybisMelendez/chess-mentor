@@ -13,7 +13,7 @@ from django.utils.timezone import make_aware
 from django.views.decorators.http import require_POST
 
 from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
-                     Elo, PuzzleAttempt, RetryPuzzle, Theme,
+                     Elo, PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
                      TrainingPreferences, VisionRushSession, VisionRushAttempt)
 from .repository import LichessDB
@@ -297,24 +297,41 @@ def home(request):
         .order_by("priority")
     )
 
-    # Elos por categoría principal (una sola query)
+    # Elos por categoría principal (promedio de temas de cada categoría)
+    from django.db.models import Avg
     category_elos = (
         ThemeElo.objects
         .filter(
             user=user,
-            theme__lichess_name__in=[
-                "opening",
-                "middlegame",
-                "endgame",
-                "mate",
-            ]
+            theme__category__isnull=False
         )
-        .select_related("theme")
+        .values('theme__category__lichess_name', 'theme__category__name')
+        .annotate(avg_elo=Avg('elo'))
+        .order_by('theme__category__name')
     )
+    
+    elo_map = {}
+    category_labels = []
+    category_elos_list = []
+    for item in category_elos:
+        lichess_name = item['theme__category__lichess_name']
+        category_name = item['theme__category__name']
+        avg_elo = round(item['avg_elo'])
+        
+        # Para el gráfico de todas las categorías
+        category_labels.append(category_name)
+        category_elos_list.append(avg_elo)
+        
+        # Para la cuadrícula de las cuatro categorías principales
+        if lichess_name in ['opening', 'middlegame', 'endgame', 'mate']:
+            class SimpleElo:
+                def __init__(self, elo):
+                    self.elo = elo
+            elo_map[lichess_name] = SimpleElo(avg_elo)
 
-    elo_map = {
-        te.theme.lichess_name: te
-        for te in category_elos
+    category_data = {
+        "labels": category_labels,
+        "data": category_elos_list,
     }
 
     # =====================================================
@@ -359,14 +376,12 @@ def home(request):
     # =====================================================
     # Temas más débiles (menor Elo)
     weakest_themes = ThemeElo.objects.filter(
-        user=user,
-        theme__is_trainable=True
+        user=user
     ).select_related("theme").order_by("elo", "theme__name")[:5]
     
     # Temas más fuertes (mayor Elo)
     strongest_themes = ThemeElo.objects.filter(
-        user=user,
-        theme__is_trainable=True
+        user=user
     ).select_related("theme").order_by("-elo", "theme__name")[:5]
 
     # =====================================================
@@ -397,6 +412,34 @@ def home(request):
             })
 
     # =====================================================
+    # Progreso de Blitz Tactics en el ciclo actual
+    # =====================================================
+    blitz_target = 5
+    blitz_completed = BlitzTacticsAttempt.objects.filter(
+        session__user=user,
+        session__date__gte=cycle.start_date,
+        session__date__lte=cycle.end_date,
+        solved=True
+    ).count()
+    blitz_progress_percent = round((blitz_completed / blitz_target) * 100, 1) if blitz_target > 0 else 0
+    if blitz_progress_percent > 100:
+        blitz_progress_percent = 100
+
+    # =====================================================
+    # Progreso de Vision Rush en el ciclo actual
+    # =====================================================
+    vision_target = 5
+    vision_completed = VisionRushAttempt.objects.filter(
+        session__user=user,
+        session__date__gte=cycle.start_date,
+        session__date__lte=cycle.end_date,
+        solved=True
+    ).count()
+    vision_progress_percent = round((vision_completed / vision_target) * 100, 1) if vision_target > 0 else 0
+    if vision_progress_percent > 100:
+        vision_progress_percent = 100
+
+    # =====================================================
     # Cálculo de días restantes en el ciclo
     # =====================================================
     days_remaining = (cycle.end_date - today).days
@@ -419,6 +462,9 @@ def home(request):
         "mate": elo_map.get("mate"),
         "cycle_themes": cycle_themes,
         
+        # Categorías para gráfico radar
+        "category_data": category_data,
+        
         # Estadísticas generales
         "total_puzzles": total_puzzles,
         "solved_puzzles": solved_puzzles,
@@ -437,6 +483,12 @@ def home(request):
         # Progreso del ciclo
         "days_remaining": days_remaining,
         "cycle_progress_percent": cycle_progress_percent,
+        "blitz_target": blitz_target,
+        "blitz_completed": blitz_completed,
+        "blitz_progress_percent": blitz_progress_percent,
+        "vision_target": vision_target,
+        "vision_completed": vision_completed,
+        "vision_progress_percent": vision_progress_percent,
         "daily_progress": daily_progress,
     }
 
@@ -452,6 +504,64 @@ def puzzle_history(request):
         .filter(user=user)
         .order_by("-start_date")
     )
+
+    # Estadísticas por ciclo para la vista de resumen
+    cycles_with_stats = []
+    for cycle in cycles:
+        # Puzzles
+        start_dt = make_aware(
+            datetime.combine(cycle.start_date, datetime.min.time())
+        )
+        end_dt = make_aware(
+            datetime.combine(cycle.end_date, datetime.max.time())
+        )
+        puzzle_attempts = PuzzleAttempt.objects.filter(
+            user=user,
+            created_at__range=(start_dt, end_dt)
+        )
+        total_puzzles = puzzle_attempts.count()
+        solved_puzzles = puzzle_attempts.filter(solved=True).count()
+        failed_puzzles = total_puzzles - solved_puzzles
+        
+        # Blitz Tactics
+        blitz_sessions = BlitzTacticsSession.objects.filter(
+            user=user,
+            date__range=(cycle.start_date, cycle.end_date)
+        )
+        total_blitz_sessions = blitz_sessions.count()
+        total_blitz_solved = sum(session.score for session in blitz_sessions)
+        total_blitz_attempted = sum(session.total_puzzles for session in blitz_sessions)
+        
+        # Vision Rush
+        vision_sessions = VisionRushSession.objects.filter(
+            user=user,
+            date__range=(cycle.start_date, cycle.end_date)
+        )
+        total_vision_sessions = vision_sessions.count()
+        total_vision_solved = sum(session.score for session in vision_sessions)
+        total_vision_attempted = sum(session.total_exercises for session in vision_sessions)
+        
+        cycles_with_stats.append({
+            "cycle": cycle,
+            "puzzles": {
+                "total": total_puzzles,
+                "solved": solved_puzzles,
+                "failed": failed_puzzles,
+                "percentage": total_puzzles and (solved_puzzles / total_puzzles * 100),
+            },
+            "blitz_tactics": {
+                "sessions": total_blitz_sessions,
+                "solved": total_blitz_solved,
+                "attempted": total_blitz_attempted,
+                "percentage": total_blitz_attempted and (total_blitz_solved / total_blitz_attempted * 100),
+            },
+            "vision_rush": {
+                "sessions": total_vision_sessions,
+                "solved": total_vision_solved,
+                "attempted": total_vision_attempted,
+                "percentage": total_vision_attempted and (total_vision_solved / total_vision_attempted * 100),
+            },
+        })
 
     selected_cycle_id = request.GET.get("cycle")
     selected_cycle = None
@@ -491,17 +601,52 @@ def puzzle_history(request):
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
         attempts = page_obj.object_list
+        
+        # Estadísticas de Blitz Tactics y Vision Rush para el ciclo seleccionado
+        blitz_sessions = BlitzTacticsSession.objects.filter(
+            user=user,
+            date__range=(selected_cycle.start_date, selected_cycle.end_date)
+        )
+        total_blitz_sessions = blitz_sessions.count()
+        total_blitz_solved = sum(session.score for session in blitz_sessions)
+        total_blitz_attempted = sum(session.total_puzzles for session in blitz_sessions)
+        
+        vision_sessions = VisionRushSession.objects.filter(
+            user=user,
+            date__range=(selected_cycle.start_date, selected_cycle.end_date)
+        )
+        total_vision_sessions = vision_sessions.count()
+        total_vision_solved = sum(session.score for session in vision_sessions)
+        total_vision_attempted = sum(session.total_exercises for session in vision_sessions)
+        
+        blitz_stats = {
+            "sessions": total_blitz_sessions,
+            "solved": total_blitz_solved,
+            "attempted": total_blitz_attempted,
+            "percentage": total_blitz_attempted and (total_blitz_solved / total_blitz_attempted * 100),
+        }
+        vision_stats = {
+            "sessions": total_vision_sessions,
+            "solved": total_vision_solved,
+            "attempted": total_vision_attempted,
+            "percentage": total_vision_attempted and (total_vision_solved / total_vision_attempted * 100),
+        }
     else:
+        blitz_stats = None
+        vision_stats = None
         page_obj = None
 
     context = {
         "cycles": cycles,
+        "cycles_with_stats": cycles_with_stats,
         "selected_cycle": selected_cycle,
         "attempts": attempts,
         "solved_count": solved_count,
         "failed_count": failed_count,
         "total_count": total_count,
         "page_obj": page_obj,
+        "blitz_stats": blitz_stats,
+        "vision_stats": vision_stats,
     }
 
     return render(request, "puzzle_history.html", context)
@@ -514,24 +659,15 @@ def theme_overview(request):
     user_theme_elos = ThemeElo.objects.filter(user=user)
 
     # =========================
-    # CATEGORÍAS ENTRENABLES
+    # TODAS LAS CATEGORÍAS CON SUS TEMAS
     # =========================
     trainable_categories = (
-        Theme.objects
-        .filter(parent__isnull=True)
+        ThemeCategory.objects
         .prefetch_related(
-            # Elo de la categoría (si existe)
             Prefetch(
-                "themeelo_set",
-                queryset=user_theme_elos,
-                to_attr="category_elo"
-            ),
-            # SOLO subtemas entrenables
-            Prefetch(
-                "subthemes",
+                "themes",
                 queryset=(
                     Theme.objects
-                    .filter(is_trainable=True)
                     .prefetch_related(
                         Prefetch(
                             "themeelo_set",
@@ -540,64 +676,38 @@ def theme_overview(request):
                         )
                     )
                 ),
-                to_attr="trainable_subthemes"
+                to_attr="trainable_themes"
             )
         )
         .order_by("name")
     )
 
-    # Filtrar: solo categorías que realmente tengan temas entrenables
+    # Filtrar: solo categorías que tengan temas
     trainable_categories = [
         c for c in trainable_categories
-        if c.trainable_subthemes
+        if c.trainable_themes
     ]
 
-    # =========================
-    # CATEGORÍAS NO ENTRENABLES
-    # =========================
-    non_trainable_categories = (
-        Theme.objects
-        .filter(parent__isnull=True)
-        .prefetch_related(
-            Prefetch(
-                "themeelo_set",
-                queryset=user_theme_elos,
-                to_attr="category_elo"
-            ),
-            # TODOS los subtemas NO entrenables
-            Prefetch(
-                "subthemes",
-                queryset=(
-                    Theme.objects
-                    .filter(is_trainable=False)
-                    .prefetch_related(
-                        Prefetch(
-                            "themeelo_set",
-                            queryset=user_theme_elos,
-                            to_attr="theme_elo"
-                        )
-                    )
-                ),
-                to_attr="trainable_subthemes"
-            )
-        )
-        .order_by("name")
-    )
-
-    # Filtrar:
-    # - que tenga temas
-    # - que NO tenga ningún tema entrenable
-    non_trainable_categories = [
-        c for c in non_trainable_categories
-        if c.trainable_subthemes and c.subthemes.filter(is_trainable=False).exists()
-    ]
+    # Calcular promedio de Elo por categoría
+    for category in trainable_categories:
+        elos = []
+        for theme in category.trainable_themes:
+            if hasattr(theme, 'theme_elo') and theme.theme_elo:
+                # theme_elo es una lista de ThemeElo (debería tener un elemento)
+                theme_elo_obj = theme.theme_elo[0] if theme.theme_elo else None
+                if theme_elo_obj:
+                    elos.append(theme_elo_obj.elo)
+        if elos:
+            category.avg_elo = sum(elos) // len(elos)
+        else:
+            category.avg_elo = None
 
     return render(
         request,
         "theme_overview.html",
         {
             "trainable_categories": trainable_categories,
-            "non_trainable_categories": non_trainable_categories,
+            "non_trainable_categories": [],
         }
     )
 
@@ -831,12 +941,40 @@ def blitz_tactics_history(request):
     """
     Historial de sesiones de Blitz Tactics del usuario.
     """
-    sessions = BlitzTacticsSession.objects.filter(
-        user=request.user
-    ).order_by("-date")
+    user = request.user
+    cycles = TrainingCycle.objects.filter(user=user).order_by("-start_date")
+    
+    selected_cycle_id = request.GET.get("cycle")
+    selected_cycle = None
+    sessions = BlitzTacticsSession.objects.filter(user=user).order_by("-date")
+    
+    if selected_cycle_id:
+        selected_cycle = get_object_or_404(
+            TrainingCycle,
+            id=selected_cycle_id,
+            user=user
+        )
+        start_dt = make_aware(
+            datetime.combine(selected_cycle.start_date, datetime.min.time())
+        )
+        end_dt = make_aware(
+            datetime.combine(selected_cycle.end_date, datetime.max.time())
+        )
+        sessions = sessions.filter(date__range=(selected_cycle.start_date, selected_cycle.end_date))
+    
+    total_sessions = sessions.count()
+    total_puzzles_solved = sum(session.score for session in sessions)
+    total_puzzles_attempted = sum(session.total_puzzles for session in sessions)
+    avg_score = total_sessions and total_puzzles_solved / total_sessions
     
     context = {
+        "cycles": cycles,
+        "selected_cycle": selected_cycle,
         "sessions": sessions,
+        "total_sessions": total_sessions,
+        "total_puzzles_solved": total_puzzles_solved,
+        "total_puzzles_attempted": total_puzzles_attempted,
+        "avg_score": avg_score,
     }
     return render(request, "blitz_tactics_history.html", context)
 
@@ -1077,11 +1215,33 @@ def vision_rush_history(request):
     """
     Historial de sesiones de Vision Rush del usuario.
     """
-    sessions = VisionRushSession.objects.filter(
-        user=request.user
-    ).order_by("-date")
+    user = request.user
+    cycles = TrainingCycle.objects.filter(user=user).order_by("-start_date")
+    
+    selected_cycle_id = request.GET.get("cycle")
+    selected_cycle = None
+    sessions = VisionRushSession.objects.filter(user=user).order_by("-date")
+    
+    if selected_cycle_id:
+        selected_cycle = get_object_or_404(
+            TrainingCycle,
+            id=selected_cycle_id,
+            user=user
+        )
+        sessions = sessions.filter(date__range=(selected_cycle.start_date, selected_cycle.end_date))
+    
+    total_sessions = sessions.count()
+    total_exercises_solved = sum(session.score for session in sessions)
+    total_exercises_attempted = sum(session.total_exercises for session in sessions)
+    avg_score = total_sessions and total_exercises_solved / total_sessions
     
     context = {
+        "cycles": cycles,
+        "selected_cycle": selected_cycle,
         "sessions": sessions,
+        "total_sessions": total_sessions,
+        "total_exercises_solved": total_exercises_solved,
+        "total_exercises_attempted": total_exercises_attempted,
+        "avg_score": avg_score,
     }
     return render(request, "vision_rush_history.html", context)

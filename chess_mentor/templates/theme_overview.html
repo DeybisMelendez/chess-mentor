@@ -6,29 +6,24 @@
 <h1>Elo general: {{request.user.elo.elo}}</h1>
 <h2>Temas entrenables</h2>
 {% for category in trainable_categories %}
-<details x-data='{eloCategory: {{request.user.elo.elo}}}'>
+<details x-data='{eloCategory: {{request.user.elo.elo}}, avgElo: {{ category.avg_elo|default:"null" }} }'>
     <summary>
         <strong>{{ category.name }}</strong>
 
         <small class="muted margin-left-05">
-            ({{ category.trainable_subthemes|length }} temas)
+            ({{ category.trainable_themes|length }} temas, Avg Elo: 
+            <template x-if="avgElo !== null">
+                <span x-text="avgElo" :class="avgElo < eloCategory-100 ? 'text-red' : avgElo > eloCategory+100 ? 'text-green' : 'text-blue'"></span>
+            </template>
+            <template x-if="avgElo === null">N/A</template>)
         </small>
-
-        <span class="muted margin-left-1">
-            Elo:
-            {% if category.category_elo %}
-                {{ category.category_elo.0.elo }}
-            {% else %}
-                —
-            {% endif %}
-        </span>
     </summary>
 
     {% if category.description %}
         <p class="muted">{{ category.description }}</p>
     {% endif %}
 
-    {% if category.trainable_subthemes %}
+    {% if category.trainable_themes %}
         <table>
             <thead>
                 <tr>
@@ -38,7 +33,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for theme in category.trainable_subthemes %}
+                {% for theme in category.trainable_themes %}
                 {% with theme_elo=theme.theme_elo.0 %}
                 <tr>
                     <td>
@@ -65,82 +60,7 @@
         <p class="muted">No hay temas entrenables en esta categoría.</p>
     {% endif %}
 </details>
-<hr />
+
 {% endfor %}
-
-<h2>Temas no entrenables</h2>
-{% for category in non_trainable_categories %}
-<details
-    {% if category.category_elo and category.lichess_name == 'opening' %}
-    x-data='{eloCategory: {{request.user.elo.elo}}}'
-    {% endif %}
-    >
-    <summary>
-        <strong>{{ category.name }}</strong>
-
-        <small class="muted margin-left-05">
-            ({{ category.trainable_subthemes|length }} temas)
-        </small>
-
-         <span class="muted margin-left-1">
-             Elo:
-             {% if category.category_elo and category.lichess_name == 'opening' %}
-                 {{ category.category_elo.0.elo }}
-             {% else %}
-                 —
-             {% endif %}
-         </span>
-    </summary>
-
-    {% if category.description %}
-        <p class="muted">{{ category.description }}</p>
-    {% endif %}
-
-    {% if category.trainable_subthemes %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Tema</th>
-                    <th>Elo</th>
-                    <th>Último entrenamiento</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for theme in category.trainable_subthemes %}
-                {% with theme_elo=theme.theme_elo.0 %}
-                <tr>
-                    <td>
-                        <strong>{{ theme.name }}</strong>
-                        {% if theme.description %}
-                            <br>
-                            <small class="muted">{{ theme.description }}</small>
-                        {% endif %}
-                    </td>
-                    <td x-data='{elo: {{theme_elo.elo}}}'
-                    x-text="elo"
-                    {% if category.category_elo and category.lichess_name == 'opening' %}
-                    :class="elo < eloCategory-100 ? 'text-red' : elo > eloCategory+100 ? 'text-green' : 'text-blue'"
-                    {% endif %}
-                    ></td>
-                    <td>
-                        {% if theme_elo.last_trained %}
-                            {{ theme_elo.last_trained|date:"Y-m-d" }}
-                        {% else %}
-                            Nunca
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endwith %}
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p class="muted">No hay temas entrenables en esta categoría.</p>
-    {% endif %}
-</details>
-
-<hr />
-{% endfor %}
-
 
 {% endblock %}

@@ -53,6 +53,143 @@ chess-board {
   aspect-ratio: 1 / 1;
 }
 
+/* Stats containers */
+main .stats-container,
+article .stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+main .stat-box,
+article .stat-box {
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-card-border-color);
+  border-radius: var(--pico-border-radius);
+  padding: 1rem;
+  text-align: center;
+  box-shadow: var(--pico-card-box-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+}
+
+main .stat-box:hover,
+article .stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--pico-card-box-shadow-hover);
+}
+
+main .stat-box__label,
+article .stat-box__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--pico-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+main .stat-box__value,
+article .stat-box__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+main .stat-box__percentage,
+article .stat-box__percentage {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--pico-color);
+  margin-top: 0.5rem;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  display: inline-block;
+}
+
+main .stat-box__subtext,
+article .stat-box__subtext {
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* Stat box variants */
+main .stat-box--solved,
+article .stat-box--solved {
+  border-color: var(--pico-color-green-300);
+  background-color: var(--pico-color-green-50);
+}
+
+main .stat-box--solved .stat-box__percentage,
+article .stat-box--solved .stat-box__percentage {
+  background-color: var(--pico-color-green-100);
+  color: var(--pico-color-green-800);
+}
+
+main .stat-box--failed,
+article .stat-box--failed {
+  border-color: var(--pico-color-red-300);
+  background-color: var(--pico-color-red-50);
+}
+
+main .stat-box--failed .stat-box__percentage,
+article .stat-box--failed .stat-box__percentage {
+  background-color: var(--pico-color-red-100);
+  color: var(--pico-color-red-800);
+}
+
+main .stat-box--progress,
+article .stat-box--progress {
+  border-color: var(--pico-color-blue-300);
+  background-color: var(--pico-color-blue-50);
+}
+
+main .stat-box--progress .stat-box__percentage,
+article .stat-box--progress .stat-box__percentage {
+  background-color: var(--pico-color-blue-100);
+  color: var(--pico-color-blue-800);
+}
+
+main .stat-box__value--solved,
+article .stat-box__value--solved {
+  color: var(--pico-color-green-700);
+}
+
+main .stat-box__value--failed,
+article .stat-box__value--failed {
+  color: var(--pico-color-red-700);
+}
+
+/* Progress bar customization */
+.progress-bar--cycle {
+  height: 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.progress-bar--cycle::-webkit-progress-bar {
+  background-color: var(--pico-secondary-background);
+  border-radius: 0.25rem;
+}
+
+.progress-bar--cycle::-webkit-progress-value {
+  background-color: var(--pico-color-blue-500);
+  border-radius: 0.25rem;
+}
+
+.progress-bar--cycle::-moz-progress-bar {
+  background-color: var(--pico-color-blue-500);
+  border-radius: 0.25rem;
+}
+
 /* Priority badges */
 .priority-badge {
   padding: 0.25rem 0.75rem;
@@ -83,4 +220,85 @@ chess-board {
   margin-left: 0.25rem;
   font-size: 0.9rem;
   display: inline-block;
+}
+
+/* Utility classes */
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
+.mode-navigation {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.action-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.pagination-list {
+  display: flex;
+  list-style: none;
+  gap: 0.5rem;
+}
+
+/* Margin utility classes (compatibility with existing templates) */
+.margin-bottom-1 {
+  margin-bottom: 1rem;
+}
+
+.margin-bottom-2 {
+  margin-bottom: 2rem;
+}
+
+.margin-top-05 {
+  margin-top: 0.5rem;
+}
+
+.margin-top-2 {
+  margin-top: 2rem;
+}
+
+/* Responsive adjustments for stats */
+@media (max-width: 768px) {
+  main .stats-container,
+  article .stats-container {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
+  
+  main .stat-box,
+  article .stat-box {
+    padding: 0.75rem;
+  }
+  
+  .stat-box__value {
+    font-size: 1.5rem;
+  }
+  
+  .stat-box__label {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  main .stats-container,
+  article .stats-container {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  main .stat-box,
+  article .stat-box {
+    padding: 0.5rem;
+  }
 }

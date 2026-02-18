@@ -15,7 +15,7 @@ RATING_DEVIATION_THRESHOLD = 120
 RATING_MIN = 700                  # Rating mínimo (Elo)
 RATING_MAX = 3000                  # Rating máximo (Elo)
 MAX_TOTAL_PUZZLES = 500_000
-MAX_PUZZLES_PER_THEME = 10000      # Máximo de puzzles por tema
+MAX_PUZZLES_PER_THEME = 12000      # Máximo de puzzles por tema
 BATCH_SIZE = 10000                 # Lotes para importación
 
 
@@ -146,7 +146,7 @@ def convert_csv_to_sqlite():
             # Filtrar temas no deseados (muy raros o irrelevantes)
             # Lista de temas principales de ajedrez - temas útiles para entrenamiento
             CHESS_THEMES = {
-                # Tácticos comunes
+                # Mediojuego
                 "fork", "pin", "skewer", "discoveredAttack", "doubleCheck",
                 "deflection", "decoy", "interference", "zugzwang",
                 "sacrifice", "clearance", "xRayAttack", "windmill",
@@ -154,22 +154,18 @@ def convert_csv_to_sqlite():
                 "attraction", "discoveredCheck", "intermezzo", "quietMove",
                 "defensiveMove", "advancedPawn", "promotion", "enPassant",
                 "castling", "underPromotion", "trappedPiece", "exposedKing",
-                "attackingF2F7",
+                "attackingF2F7", "equality", "kingsideAttack", "queensideAttack",
 
-                # Patrones de mate
+                # Jaque mate
                 "backRankMate", "smotheredMate", "arabianMate", "hookMate",
                 "pillsburysMate", "operaMate", "cornerMate", "anastasiaMate",
                 "morphysMate", "triangleMate", "blindSwineMate", "killBoxMate",
                 "dovetailMate", "bodenMate", "doubleBishopMate", "vukovicMate",
-                "balestraMate",
-
-                # Ataque posicional
-                "kingsideAttack", "queensideAttack",
+                "balestraMate", "epauletteMate", "hookMate", "swallowstailMate",
 
                 # Finales
-                "pawnEndgame", "rookEndgame", "bishopEndgame", "knightEndgame",
-                "queenEndgame", "queenRookEndgame", "bishopPair",
-                "oppositeColoredBishops", "sameColoredBishops",
+                "endgame", "pawnEndgame", "rookEndgame", "bishopEndgame", "knightEndgame",
+                "queenEndgame", "queenRookEndgame"
             }
 
             # Filtrar solo temas conocidos para reducir cantidad de temas únicos

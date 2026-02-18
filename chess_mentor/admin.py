@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 
 from .models import (ActiveExercise, Elo, PuzzleAttempt, RetryPuzzle, Theme,
-                     ThemeElo, TrainingCycle, TrainingCycleTheme,
+                     ThemeCategory, ThemeElo, TrainingCycle, TrainingCycleTheme,
                      TrainingPreferences)
 
 User = get_user_model()
@@ -19,14 +19,12 @@ class TrainingPreferencesAdmin(admin.ModelAdmin):
 class ThemeAdmin(admin.ModelAdmin):
     list_display = (
         "name",
-        "parent",
-        "is_trainable",
+        "category",
         "lichess_name",
     )
 
     list_filter = (
-        "is_trainable",
-        "parent",
+        "category",
     )
 
     search_fields = (
@@ -34,9 +32,9 @@ class ThemeAdmin(admin.ModelAdmin):
         "lichess_name",
     )
 
-    ordering = ("parent__name", "name")
+    ordering = ("category__name", "name")
 
-    autocomplete_fields = ("parent",)
+    autocomplete_fields = ("category",)
 
     fieldsets = (
         (
@@ -49,15 +47,13 @@ class ThemeAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Jerarquía",
+            "Categoría",
             {
                 "fields": (
-                    "parent",
-                    "is_trainable",
+                    "category",
                 ),
                 "description": (
-                    "Una categoría es un Theme sin parent y no entrenable. "
-                    "Un tema entrenable debe tener una categoría padre."
+                    "Categoría a la que pertenece el tema."
                 ),
             },
         ),
@@ -68,26 +64,27 @@ class ThemeAdmin(admin.ModelAdmin):
                     "lichess_name",
                 ),
                 "description": (
-                    "Solo aplica a temas entrenables."
+                    "Nombre del tema en Lichess."
                 ),
             },
         ),
     )
 
-    def get_readonly_fields(self, request, obj=None):
-        """
-        Evita editar lichess_name en categorías
-        """
-        if obj and not obj.is_trainable:
-            return ("lichess_name",)
-        return ()
+
 
     def get_queryset(self, request):
         """
-        Optimiza queries en admin (parent)
+        Optimiza queries en admin (category)
         """
         qs = super().get_queryset(request)
-        return qs.select_related("parent")
+        return qs.select_related("category")
+
+
+@admin.register(ThemeCategory)
+class ThemeCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "lichess_name", "description")
+    search_fields = ("name", "lichess_name")
+    ordering = ("name",)
 
 
 class TrainingCycleThemeInline(admin.TabularInline):

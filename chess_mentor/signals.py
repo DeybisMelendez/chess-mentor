@@ -60,8 +60,7 @@ def assign_cycle_themes(sender, instance, created, **kwargs):
     theme_elos = (
         ThemeElo.objects
         .filter(
-            user=instance.user,
-            theme__is_trainable=True
+            user=instance.user
         )
         .select_related("theme")
     )

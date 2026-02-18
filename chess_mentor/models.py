@@ -18,60 +18,64 @@ class TrainingPreferences(models.Model):
         return f"Preferences - {self.user}"
 
 
-class Theme(models.Model):
+class ThemeCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     lichess_name = models.CharField(
         max_length=100,
         unique=True,
         null=True,
         blank=True,
-        help_text="Nombre del tema en Lichess (solo para temas entrenables)"
+        help_text="Nombre de la categoría en Lichess (opening/middlegame/endgame/mate)"
     )
-
-    parent = models.ForeignKey(
-        "self",
-        on_delete=models.CASCADE,
-        null=True,
+    description = models.TextField(
         blank=True,
-        related_name="subthemes",
-        help_text="Categoría padre (otro Theme)"
+        help_text="Descripción de la categoría"
     )
 
-    is_trainable = models.BooleanField(
-        default=True,
-        help_text="Indica si el tema puede ser entrenado directamente"
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "Theme categories"
+
+    def __str__(self):
+        return self.name
+
+
+class Theme(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    lichess_name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Nombre del tema en Lichess"
+    )
+
+    category = models.ForeignKey(
+        ThemeCategory,
+        on_delete=models.CASCADE,
+        related_name="themes",
+        help_text="Categoría a la que pertenece el tema"
     )
 
     description = models.TextField(
         blank=True,
-        help_text="Descripción del tema o categoría"
+        help_text="Descripción del tema"
     )
 
     def clean(self):
-        if self.parent is None and self.is_trainable:
+        if not self.category:
             raise ValidationError(
-                "Un tema entrenable debe tener una categoría padre."
+                "El tema debe tener una categoría."
             )
-
-        if self.parent and not self.parent.is_trainable:
-            pass  # OK, parent es categoría
-
-        if self.parent and self.parent.parent:
+        if not self.lichess_name:
             raise ValidationError(
-                "Solo se permite un nivel de jerarquía (categoría → tema)."
-            )
-        
-        if self.is_trainable and not self.lichess_name:
-            raise ValidationError(
-                "Un tema entrenable debe tener un lichess_name."
+                "El tema debe tener un lichess_name."
             )
 
     class Meta:
         ordering = ["name"]
 
     def __str__(self):
-        if self.parent:
-            return f"{self.parent.name} → {self.name}"
+        if self.category:
+            return f"{self.category.name} → {self.name}"
         return self.name
 
 
