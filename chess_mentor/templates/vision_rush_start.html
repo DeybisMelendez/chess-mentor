@@ -18,7 +18,6 @@
                 <li>Posiciones aleatorias con 5 a 10 piezas</li>
                 <li>Preguntas sobre conteo de piezas, jaques, capturas, movimientos legales y ubicación de piezas</li>
                 <li>No afecta tu rating Elo</li>
-                <li>Un intento por día</li>
             </ul>
         </div>
         
@@ -27,13 +26,14 @@
             {% if has_active_session %}
                 <p>Tienes una sesión activa. Puedes continuar donde la dejaste.</p>
                 <a href="{% url 'vision_rush_puzzle' %}" role="button">Continuar sesión</a>
-            {% elif completed_session %}
-                <p>Ya completaste tu sesión de hoy.</p>
-                <p><strong>Resultado:</strong> {{ completed_session.score }} ejercicios resueltos</p>
-                <p><strong>Fallos:</strong> {{ completed_session.failures }}</p>
-                <a href="{% url 'vision_rush_results' completed_session.id %}" role="button">Ver detalles</a>
             {% else %}
-                <p>Aún no has realizado tu sesión de hoy.</p>
+                {% if completed_session %}
+                    <p>Ya completaste tu sesión de hoy.</p>
+                    <p><strong>Resultado:</strong> {{ completed_session.score }} ejercicios resueltos</p>
+                    <p><strong>Fallos:</strong> {{ completed_session.failures }}</p>
+                    <a href="{% url 'vision_rush_results' completed_session.id %}" role="button">Ver detalles</a>
+                {% endif %}
+                <p>Puedes comenzar una nueva sesión.</p>
                 <a href="{% url 'vision_rush_new' %}" role="button">Comenzar nueva sesión</a>
             {% endif %}
         </div>

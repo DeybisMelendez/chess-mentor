@@ -745,39 +745,31 @@ def blitz_tactics_start(request):
 @login_required
 def blitz_tactics_new(request):
     """
-    Crea una nueva sesión de Blitz Tactics para hoy.
+    Crea una nueva sesión de Blitz Tactics.
     """
     user = request.user
     today = timezone.now().date()
-    
-    # Verificar que no exista una sesión activa
+
     existing = BlitzTacticsSession.objects.filter(
         user=user,
-        date=today
+        date=today,
+        completed=False
     ).first()
-    if existing:
-        if existing.is_active:
-            return redirect("blitz_tactics_puzzle")
-        else:
-            # Si ya existe pero está completada, podemos crear una nueva? 
-            # Según reglas, solo una por día. Podemos redirigir a resultados.
-            return redirect("blitz_tactics_results", session_id=existing.id)
-    
-    # Seleccionar puzzles
+    if existing and existing.is_active:
+        return redirect("blitz_tactics_puzzle")
+
     puzzle_ids = select_blitz_puzzles(user)
-    
-    # Crear sesión
+
     session = BlitzTacticsSession.objects.create(
         user=user,
         date=today,
         puzzles=puzzle_ids,
-        time_remaining=180,  # 3 minutos
+        time_remaining=180,
         failures=0,
         completed=False,
         score=0,
     )
-    
-    # Redirigir al primer puzzle
+
     return redirect("blitz_tactics_puzzle")
 
 
@@ -1071,28 +1063,21 @@ def vision_rush_start(request):
 @login_required
 def vision_rush_new(request):
     """
-    Crea una nueva sesión de Vision Rush para hoy.
+    Crea una nueva sesión de Vision Rush.
     """
     user = request.user
     today = timezone.now().date()
-    
-    # Verificar que no exista una sesión activa
+
     existing = VisionRushSession.objects.filter(
         user=user,
-        date=today
+        date=today,
+        completed=False
     ).first()
-    if existing:
-        if existing.is_active:
-            return redirect("vision_rush_puzzle")
-        else:
-            # Si ya existe pero está completada, podemos crear una nueva? 
-            # Según reglas, solo una por día. Podemos redirigir a resultados.
-            return redirect("vision_rush_results", session_id=existing.id)
-    
-    # Seleccionar ejercicios
+    if existing and existing.is_active:
+        return redirect("vision_rush_puzzle")
+
     exercises = select_vision_rush_exercises(user)
-    
-    # Crear sesión
+
     session = VisionRushSession.objects.create(
         user=user,
         date=today,
@@ -1101,8 +1086,7 @@ def vision_rush_new(request):
         completed=False,
         score=0,
     )
-    
-    # Redirigir al primer ejercicio
+
     return redirect("vision_rush_puzzle")
 
 

@@ -226,90 +226,128 @@ def select_blitz_puzzles(user):
 
 
 
-def generate_random_position(min_pieces=5, max_pieces=10):
+def generate_random_position(min_pieces=5, max_pieces=10, exercise_number=1):
     """
     Genera una posición aleatoria de ajedrez válida con min_pieces a max_pieces.
     Siempre incluye ambos reyes. Balancea los colores para evitar sesgo.
     Los peones blancos solo en filas 2-6, peones negros en filas 3-7.
     Evita posiciones en jaque al inicio.
+
+    Límites de piezas:
+    - 1 Reina máximo total (cualquier color)
+    - 2 Torres máximo por color
+    - 2 Alfiles máximo por color
+    - 2 Caballos máximo por color
+    - 8 Peones máximo por color
+
+    Dificultad progresiva:
+    - Ejercicios 1-7: Solo piezas menores (P, B, N)
+    - Ejercicios 8-15: Todas las piezas (P, B, N, R, Q)
     """
     chesslib = get_chess_lib()
-    pieces = ["P", "N", "B", "R", "Q"]
-    
+
     while True:
-        board = chesslib.Board(fen=None)  # Tablero vacío
-        # Colocar reyes
+        board = chesslib.Board(fen=None)
         king_squares = random.sample(list(chesslib.SQUARES), 2)
         board.set_piece_at(king_squares[0], chesslib.Piece(chesslib.KING, chesslib.WHITE))
         board.set_piece_at(king_squares[1], chesslib.Piece(chesslib.KING, chesslib.BLACK))
-        
-        # Determinar número total de piezas (min_pieces a max_pieces)
+
         total_pieces = random.randint(min_pieces, max_pieces)
-        # Ya colocamos 2 reyes, necesitamos colocar total_pieces - 2 piezas más
         remaining = total_pieces - 2
         if remaining <= 0:
             continue
-        
-        # Lista de casillas disponibles (excluyendo las ocupadas por reyes)
+
         available_squares = [sq for sq in chesslib.SQUARES if sq not in king_squares]
         if len(available_squares) < remaining:
             continue
-        
+
         chosen_squares = random.sample(available_squares, remaining)
-        
-        # Balancear colores: asegurar distribución más equitativa
-        # Queremos que la diferencia entre piezas blancas y negras no sea muy grande
-        # Para remaining piezas, calcular distribución más balanceada
-        # Ejemplo: para 8 piezas, queremos entre 3-5 de cada color
-        # Cada lado debe tener entre 1/3 y 2/3 del total de piezas
-        # Ya tenemos 1 rey blanco y 1 rey negro
-        # Total de piezas = 2 + remaining
+
         total_pieces = 2 + remaining
-        
-        # Mínimo de piezas blancas totales = ceil(total_pieces * 1/3)
-        # Ya tenemos 1 rey blanco, así que necesitamos agregar al menos:
-        min_white_total = (total_pieces + 2) // 3  # ceil(total_pieces / 3)
-        min_white_to_add = max(0, min_white_total - 1)  # restar el rey que ya tenemos
-        
-        # Máximo de piezas blancas totales = floor(total_pieces * 2/3)
-        max_white_total = (total_pieces * 2) // 3  # floor(total_pieces * 2/3)
-        max_white_to_add = max_white_total - 1  # restar el rey que ya tenemos
-        
-        # Asegurar límites válidos
+
+        min_white_total = (total_pieces + 2) // 3
+        min_white_to_add = max(0, min_white_total - 1)
+
+        max_white_total = (total_pieces * 2) // 3
+        max_white_to_add = max_white_total - 1
+
         min_white = max(0, min_white_to_add)
         max_white = min(remaining, max_white_to_add)
-        
-        # Asegurar que max_white sea al menos min_white
+
         if max_white < min_white:
             max_white = min_white
         if min_white > max_white:
             min_white = max_white
-        
+
         white_pieces_to_add = random.randint(min_white, max_white)
         black_pieces_to_add = remaining - white_pieces_to_add
-        
-        # Crear lista de colores balanceados
+
         colors_list = [chesslib.WHITE] * white_pieces_to_add + [chesslib.BLACK] * black_pieces_to_add
         random.shuffle(colors_list)
-        
+
+        queen_placed = False
+        per_color_counts = {
+            chesslib.WHITE: {"B": 0, "N": 0, "R": 0, "P": 0},
+            chesslib.BLACK: {"B": 0, "N": 0, "R": 0, "P": 0}
+        }
+
+        all_minor_pieces = ["P", "B", "N"]
+        all_pieces = ["P", "N", "B", "R", "Q"]
+
         for i, sq in enumerate(chosen_squares):
-            # Elegir pieza aleatoria (excluyendo reyes)
-            piece_type = random.choice(pieces)
             color = colors_list[i]
-            
-            # Si es peón, verificar restricciones de fila
+
+            if exercise_number <= 7:
+                pieces_pool = all_minor_pieces.copy()
+            else:
+                pieces_pool = all_pieces.copy()
+
+            available_pieces = []
+            for p in pieces_pool:
+                if p == "Q":
+                    if not queen_placed:
+                        available_pieces.append(p)
+                elif p == "R":
+                    if per_color_counts[color]["R"] < 2:
+                        available_pieces.append(p)
+                elif p == "B":
+                    if per_color_counts[color]["B"] < 2:
+                        available_pieces.append(p)
+                elif p == "N":
+                    if per_color_counts[color]["N"] < 2:
+                        available_pieces.append(p)
+                elif p == "P":
+                    if per_color_counts[color]["P"] < 8:
+                        available_pieces.append(p)
+
+            if not available_pieces:
+                break
+
+            piece_type = random.choice(available_pieces)
+
             if piece_type == "P":
                 row = chesslib.square_rank(sq)
-                if color == chesslib.WHITE and row >= 6:  # filas 7-8 (0-indexed: 6,7) no peones blancos
-                    # Cambiar a pieza no peón
-                    piece_type = random.choice(["N", "B", "R", "Q"])
-                elif color == chesslib.BLACK and row <= 1:  # filas 1-2 (0-indexed: 0,1) no peones negros
-                    piece_type = random.choice(["N", "B", "R", "Q"])
-            
+                if color == chesslib.WHITE and row >= 6:
+                    fallback = [p for p in ["N", "B"] if per_color_counts[color][p] < 2]
+                    if fallback:
+                        piece_type = random.choice(fallback)
+                    else:
+                        continue
+                elif color == chesslib.BLACK and row <= 1:
+                    fallback = [p for p in ["N", "B"] if per_color_counts[color][p] < 2]
+                    if fallback:
+                        piece_type = random.choice(fallback)
+                    else:
+                        continue
+
+            if piece_type == "Q":
+                queen_placed = True
+            elif piece_type in per_color_counts[color]:
+                per_color_counts[color][piece_type] += 1
+
             piece = chesslib.Piece.from_symbol(piece_type.lower() if color == chesslib.BLACK else piece_type)
             board.set_piece_at(sq, piece)
-        
-        # Validar que no haya peones en primera o última fila
+
         valid = True
         for sq in chesslib.SQUARES:
             piece = board.piece_at(sq)
@@ -320,26 +358,22 @@ def generate_random_position(min_pieces=5, max_pieces=10):
                     break
         if not valid:
             continue
-        
-        # Elegir aleatoriamente quién mueve (turno)
+
         board.turn = random.choice([chesslib.WHITE, chesslib.BLACK])
-        
-        # Verificar que la posición sea válida y ningún rey esté en jaque
+
         if not board.is_valid():
             continue
-        
-        # Verificar si algún rey está en jaque
+
         original_turn = board.turn
         board.turn = chesslib.WHITE
         white_check = board.is_check()
         board.turn = chesslib.BLACK
         black_check = board.is_check()
-        board.turn = original_turn  # restaurar turno original
-        
+        board.turn = original_turn
+
         if white_check or black_check:
-            # Algún rey en jaque, regenerar posición
             continue
-        
+
         return board
 
 
@@ -434,7 +468,11 @@ def select_vision_rush_exercises(user):
                 else:
                     min_pieces, max_pieces = 8, 10
                 
-                board = generate_random_position(min_pieces=min_pieces, max_pieces=max_pieces)
+                board = generate_random_position(
+                    min_pieces=min_pieces,
+                    max_pieces=max_pieces,
+                    exercise_number=len(exercises) + 1
+                )
                 
                 # Determinar color que tiene el turno (quién mueve)
                 turn_color = board.turn  # chesslib.WHITE o chesslib.BLACK

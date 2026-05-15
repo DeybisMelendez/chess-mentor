@@ -290,12 +290,6 @@ class BlitzTacticsSession(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "date"],
-                name="unique_user_daily_blitz_session"
-            )
-        ]
         indexes = [
             models.Index(fields=["user", "date"]),
         ]
@@ -387,12 +381,6 @@ class VisionRushSession(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "date"],
-                name="unique_user_daily_vision_rush_session"
-            )
-        ]
         indexes = [
             models.Index(fields=["user", "date"]),
         ]

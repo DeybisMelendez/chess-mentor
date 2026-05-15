@@ -1,33 +1,33 @@
 <header class="container">
     <nav>
         <ul>
-            <li>ChessMentor</li>
-        </ul>
-        <ul>
+            <li><a href="{% url 'home' %}">Home</a></li>
             {% if user.is_authenticated %}
             <li>
-                <a href="{% url 'home' %}">Inicio</a>
+                <details class="dropdown">
+                    <summary>
+                    Entrena
+                    </summary>
+                    <ul dir="rtl">
+                    <li><a href="{% url 'get_puzzle' %}">Puzzle</a></li>
+                    <li><a href="{% url 'blitz_tactics_start' %}">Blitz Tactics</a></li>
+                    <li><a href="{% url 'vision_rush_start' %}">Vision Rush</a></li>
+                    </ul>
+                </details>
             </li>
             <li>
-                <a href="{% url 'get_puzzle' %}">Entrenar</a>
+                <details class="dropdown">
+                    <summary>
+                    Datos
+                    </summary>
+                    <ul dir="rtl">
+                    <li><a href="{% url 'puzzle_history' %}">Historial</a></li>
+                    <li><a href="{% url 'theme_overview' %}">Temas</a></li>
+                    </ul>
+                </details>
             </li>
-            <li>
-                <a href="{% url 'blitz_tactics_start' %}">Blitz Tactics</a>
-            </li>
-            <li>
-                <a href="{% url 'vision_rush_start' %}">Vision Rush</a>
-            </li>
-            <li>
-                <a href="{% url 'puzzle_history' %}">Historial</a>
-            </li>
-            <li>
-                <a href="{% url 'theme_overview' %}">Temas</a>
-            </li>
-
             {% else %}
-            <li>
-                <a href="{% url 'login' %}">Login</a>
-            </li>
+            <li><a href="{% url 'login' %}">Login</a></li>
             {% endif %}
         </ul>
     </nav>

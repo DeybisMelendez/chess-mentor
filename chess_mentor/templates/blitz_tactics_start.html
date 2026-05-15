@@ -18,7 +18,6 @@
                 <li><strong>30 puzzles</strong> seleccionados de tus 10 temas más débiles</li>
                 <li>Rating de puzzles: tu rating -300 (±100 puntos)</li>
                 <li>No afecta tu rating Elo</li>
-                <li>Un intento por día</li>
             </ul>
         </div>
         
@@ -27,14 +26,15 @@
             {% if has_active_session %}
                 <p>Tienes una sesión activa. Puedes continuar donde la dejaste.</p>
                 <a href="{% url 'blitz_tactics_puzzle' %}" role="button">Continuar sesión</a>
-            {% elif completed_session %}
-                <p>Ya completaste tu sesión de hoy.</p>
-                <p><strong>Resultado:</strong> {{ completed_session.score }} puzzles resueltos</p>
-                <p><strong>Fallos:</strong> {{ completed_session.failures }}</p>
-                <p><strong>Tiempo restante:</strong> {{ completed_session.time_remaining }} segundos</p>
-                <a href="{% url 'blitz_tactics_results' completed_session.id %}" role="button">Ver detalles</a>
             {% else %}
-                <p>Aún no has realizado tu sesión de hoy.</p>
+                {% if completed_session %}
+                    <p>Ya completaste tu sesión de hoy.</p>
+                    <p><strong>Resultado:</strong> {{ completed_session.score }} puzzles resueltos</p>
+                    <p><strong>Fallos:</strong> {{ completed_session.failures }}</p>
+                    <p><strong>Tiempo restante:</strong> {{ completed_session.time_remaining }} segundos</p>
+                    <a href="{% url 'blitz_tactics_results' completed_session.id %}" role="button">Ver detalles</a>
+                {% endif %}
+                <p>Puedes comenzar una nueva sesión.</p>
                 <a href="{% url 'blitz_tactics_new' %}" role="button">Comenzar nueva sesión</a>
             {% endif %}
         </div>
