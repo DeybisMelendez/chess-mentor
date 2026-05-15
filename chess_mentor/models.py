@@ -312,7 +312,7 @@ class BlitzTacticsSession(models.Model):
     def record_success(self):
         self.score += 1
         self.current_puzzle_index += 1
-        self.add_time(2)  # incremento de 2 segundos por jugada correcta
+        self.add_time(2)
         if self.current_puzzle_index >= self.total_puzzles:
             self.completed = True
         self.save(update_fields=["score", "current_puzzle_index", "completed", "updated_at"])
@@ -449,6 +449,80 @@ class VisionRushAttempt(models.Model):
 
     def __str__(self):
         return f"Vision Rush Attempt - {'Solved' if self.solved else 'Failed'}"
+
+
+def validate_pdf_extension(value):
+    from django.core.exceptions import ValidationError
+    import os
+    ext = os.path.splitext(value.name)[1].lower()
+    if ext != '.pdf':
+        raise ValidationError('Solo se permiten archivos PDF.')
+
+
+class DocumentCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'categoría de documento'
+        verbose_name_plural = 'categorías de documentos'
+        ordering = ('name',)
+
+    def __str__(self):
+        return self.name
+
+
+class DocumentTag(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'etiqueta de documento'
+        verbose_name_plural = 'etiquetas de documentos'
+        ordering = ('name',)
+
+    def __str__(self):
+        return self.name
+
+
+class Document(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    category = models.ForeignKey(
+        DocumentCategory,
+        on_delete=models.PROTECT,
+        related_name='documents'
+    )
+    tags = models.ManyToManyField(
+        DocumentTag,
+        related_name='documents',
+        blank=True
+    )
+    file = models.FileField(
+        upload_to='documents/%Y/%m/',
+        validators=[validate_pdf_extension]
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='uploaded_documents'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'documento'
+        verbose_name_plural = 'documentos'
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return self.title
+
+    def delete(self, using=None, keep_parents=False):
+        if self.file:
+            self.file.delete()
+        super().delete(using, keep_parents)
 
 
 """

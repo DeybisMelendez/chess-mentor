@@ -13,6 +13,7 @@ from django.utils.timezone import make_aware
 from django.views.decorators.http import require_POST
 
 from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
+                     Document, DocumentCategory, DocumentTag,
                      Elo, PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
                      TrainingPreferences, VisionRushSession, VisionRushAttempt)
@@ -1288,3 +1289,143 @@ def vision_rush_history(request):
         "avg_score": avg_score,
     }
     return render(request, "vision_rush_history.html", context)
+
+
+def superuser_required(view_func):
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+        if not request.user.is_superuser:
+            raise Http404
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+@login_required
+def documents_list(request):
+    categories = DocumentCategory.objects.all().order_by("name")
+    tags = DocumentTag.objects.all().order_by("name")
+    documents = Document.objects.filter(is_active=True).select_related(
+        "category", "uploaded_by"
+    ).prefetch_related("tags")
+
+    category_id = request.GET.get("category")
+    tag_id = request.GET.get("tag")
+
+    if category_id:
+        documents = documents.filter(category_id=category_id)
+    if tag_id:
+        documents = documents.filter(tags__id=tag_id)
+
+    context = {
+        "documents": documents,
+        "categories": categories,
+        "tags": tags,
+        "selected_category": category_id,
+        "selected_tag": tag_id,
+    }
+    return render(request, "documents.html", context)
+
+
+@superuser_required
+def document_upload(request):
+    if request.method == "POST":
+        title = request.POST.get("title", "").strip()
+        description = request.POST.get("description", "").strip()
+        category_id = request.POST.get("category")
+        tag_ids = request.POST.getlist("tags")
+        file = request.FILES.get("file")
+
+        if not title or not category_id or not file:
+            return render(request, "document_upload.html", {
+                "categories": DocumentCategory.objects.all().order_by("name"),
+                "tags": DocumentTag.objects.all().order_by("name"),
+                "error": "Todos los campos son requeridos.",
+            })
+
+        category = get_object_or_404(DocumentCategory, id=category_id)
+
+        document = Document.objects.create(
+            title=title,
+            description=description,
+            category=category,
+            file=file,
+            uploaded_by=request.user,
+        )
+
+        if tag_ids:
+            tags = DocumentTag.objects.filter(id__in=tag_ids)
+            document.tags.set(tags)
+
+        return redirect("documents")
+
+    categories = DocumentCategory.objects.all().order_by("name")
+    tags = DocumentTag.objects.all().order_by("name")
+    return render(request, "document_upload.html", {
+        "categories": categories,
+        "tags": tags,
+    })
+
+
+@superuser_required
+@require_POST
+def document_delete(request, document_id):
+    document = get_object_or_404(Document, id=document_id)
+    document.delete()
+    return redirect("documents")
+
+
+@superuser_required
+def categories_list(request):
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
+        if name:
+            DocumentCategory.objects.create(name=name, description=description)
+        return redirect("categories")
+
+    categories = DocumentCategory.objects.all().order_by("name")
+    return render(request, "categories.html", {"categories": categories})
+
+
+@superuser_required
+def tags_list(request):
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        if name:
+            DocumentTag.objects.create(name=name)
+        return redirect("tags")
+
+    tags = DocumentTag.objects.all().order_by("name")
+    return render(request, "tags.html", {"tags": tags})
+
+
+@superuser_required
+def document_edit(request, document_id):
+    document = get_object_or_404(Document, id=document_id)
+
+    if request.method == "POST":
+        document.title = request.POST.get("title", "").strip()
+        document.description = request.POST.get("description", "").strip()
+        category_id = request.POST.get("category")
+        tag_ids = request.POST.getlist("tags")
+
+        if category_id:
+            document.category = get_object_or_404(DocumentCategory, id=category_id)
+
+        document.save()
+
+        if tag_ids:
+            document.tags.set(DocumentTag.objects.filter(id__in=tag_ids))
+        else:
+            document.tags.clear()
+
+        return redirect("documents")
+
+    categories = DocumentCategory.objects.all().order_by("name")
+    tags = DocumentTag.objects.all().order_by("name")
+    return render(request, "document_edit.html", {
+        "document": document,
+        "categories": categories,
+        "tags": tags,
+    })

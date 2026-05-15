@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Documentos{% endblock %}
+
+{% block content %}
+<h1>Documentos</h1>
+
+<div class="container">
+    <div>
+            <form method="get">
+                <select name="category" onchange="this.form.submit()">
+                    <option value="">Todas las categorías</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:"s" %}selected{% endif %}>
+                        {{ cat.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <select name="tag" onchange="this.form.submit()">
+                    <option value="">Todos los tags</option>
+                    {% for tag in tags %}
+                    <option value="{{ tag.id }}" {% if selected_tag == tag.id|stringformat:"s" %}selected{% endif %}>
+                        {{ tag.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+        {% if request.user.is_superuser %}
+        <div>
+            <a href="{% url 'document_upload' %}" role="button">Subir documento</a>
+            <a href="{% url 'categories' %}" role="button" class="secondary">Categorías</a>
+            <a href="{% url 'tags' %}" role="button" class="secondary">Tags</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if documents %}
+    <div class="grid">
+        {% for doc in documents %}
+        <article>
+                <header>
+                    <h3>
+                        <a href="{{ doc.file.url }}" target="_blank">{{ doc.title }}</a>
+                    </h3>
+                    {% if doc.description %}
+                    <p>{{ doc.description }}</p>
+                    {% endif %}
+                    <div>
+                        <span class="badge">{{ doc.category.name }}</span>
+                        {% for tag in doc.tags.all %}
+                        <span class="priority-badge">{{ tag.name }}</span>
+                        {% endfor %}
+                    </div>
+                    <small class="muted">Subido por {{ doc.uploaded_by.username }} el {{ doc.created_at|date:"Y-m-d" }}</small>
+                </header>
+                <div>
+                    <a href="{{ doc.file.url }}" target="_blank" role="button" class="secondary">Ver PDF</a>
+                    {% if request.user.is_superuser %}
+                    <a href="{% url 'document_edit' doc.id %}" role="button">Editar</a>
+                    {% endif %}
+                </div>
+                {% if request.user.is_superuser %}
+                <form method="post" action="{% url 'document_delete' doc.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="outline" onclick="return confirm('¿Eliminar este documento?');">
+                        Eliminar
+                    </button>
+                </form>
+                {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No hay documentos disponibles.</p>
+    {% endif %}
+</div>
+{% endblock %}

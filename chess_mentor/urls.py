@@ -37,4 +37,13 @@ urlpatterns = [
          views.vision_rush_results, name="vision_rush_results"),
     path("vision-rush/history/", views.vision_rush_history,
          name="vision_rush_history"),
+
+    # Documents
+    path("documents/", views.documents_list, name="documents"),
+    path("documents/upload/", views.document_upload, name="document_upload"),
+    path("documents/<int:document_id>/edit/", views.document_edit, name="document_edit"),
+    path("documents/<int:document_id>/delete/",
+         views.document_delete, name="document_delete"),
+    path("documents/categories/", views.categories_list, name="categories"),
+    path("documents/tags/", views.tags_list, name="tags"),
 ]

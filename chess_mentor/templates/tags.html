@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Tags{% endblock %}
+
+{% block content %}
+<h1>Tags de documentos</h1>
+
+<div class="container" style="max-width: 600px;">
+    <form method="post" style="margin-bottom: 2rem;">
+        {% csrf_token %}
+        <label for="name">
+            Nuevo tag
+            <input type="text" id="name" name="name" required placeholder="Nombre del tag">
+        </label>
+        <button type="submit">Crear tag</button>
+    </form>
+
+    {% if tags %}
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+        {% for tag in tags %}
+        <span class="badge">{{ tag.name }} ({{ tag.documents.count }})</span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No hay tags creados.</p>
+    {% endif %}
+
+    <a href="{% url 'documents' %}" class="margin-top-1">← Volver a documentos</a>
+</div>
+{% endblock %}

@@ -1,9 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 
-from .models import (ActiveExercise, Elo, PuzzleAttempt, RetryPuzzle, Theme,
-                     ThemeCategory, ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPreferences)
+from .models import (ActiveExercise, Document, DocumentCategory, DocumentTag, Elo,
+                     PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory, ThemeElo,
+                     TrainingCycle, TrainingCycleTheme, TrainingPreferences)
 
 User = get_user_model()
 
@@ -183,3 +183,25 @@ class RetryPuzzleAdmin(admin.ModelAdmin):
     readonly_fields = ("last_attempt_at",)
     autocomplete_fields = ("user", "theme")
     list_select_related = ("user", "theme")
+
+
+@admin.register(DocumentCategory)
+class DocumentCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "description", "created_at")
+    search_fields = ("name",)
+
+
+@admin.register(DocumentTag)
+class DocumentTagAdmin(admin.ModelAdmin):
+    list_display = ("name", "created_at")
+    search_fields = ("name",)
+
+
+@admin.register(Document)
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ("title", "category", "uploaded_by", "created_at", "is_active")
+    list_filter = ("category", "is_active", "created_at")
+    search_fields = ("title", "description")
+    readonly_fields = ("uploaded_by", "created_at")
+    autocomplete_fields = ("category", "uploaded_by")
+    list_select_related = ("category", "uploaded_by")

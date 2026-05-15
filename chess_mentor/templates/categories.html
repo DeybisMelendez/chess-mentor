@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Categorías{% endblock %}
+
+{% block content %}
+<h1>Categorías de documentos</h1>
+
+<div class="container" style="max-width: 600px;">
+    <form method="post" style="margin-bottom: 2rem;">
+        {% csrf_token %}
+        <label for="name">
+            Nueva categoría
+            <input type="text" id="name" name="name" required placeholder="Nombre de la categoría">
+        </label>
+        <label for="description">
+            Descripción (opcional)
+            <textarea id="description" name="description" rows="2" placeholder="Descripción"></textarea>
+        </label>
+        <button type="submit">Crear categoría</button>
+    </form>
+
+    {% if categories %}
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Documentos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td><strong>{{ cat.name }}</strong></td>
+                <td class="muted">{{ cat.description|default:"-" }}</td>
+                <td>{{ cat.documents.count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No hay categorías creadas.</p>
+    {% endif %}
+
+    <a href="{% url 'documents' %}" class="margin-top-1">← Volver a documentos</a>
+</div>
+{% endblock %}

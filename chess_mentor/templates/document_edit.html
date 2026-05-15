@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Editar documento{% endblock %}
+
+{% block content %}
+<h1>Editar documento</h1>
+
+<div class="container" style="max-width: 600px;">
+    <form method="post">
+        {% csrf_token %}
+
+        <label for="title">
+            Título
+            <input type="text" id="title" name="title" value="{{ document.title }}" required>
+        </label>
+
+        <label for="description">
+            Descripción
+            <textarea id="description" name="description" rows="3">{{ document.description }}</textarea>
+        </label>
+
+        <label for="category">
+            Categoría
+            <select id="category" name="category" required>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if document.category.id == cat.id %}selected{% endif %}>
+                    {{ cat.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label for="tags">
+            Tags (seleccionar varios)
+            <select id="tags" name="tags" multiple size="5">
+                {% for tag in tags %}
+                <option value="{{ tag.id }}" {% if tag in document.tags.all %}selected{% endif %}>
+                    {{ tag.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <div style="margin-top: 1rem;">
+            <p class="muted">
+                <strong>Archivo actual:</strong> {{ document.file.name }}
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+            <button type="submit">Guardar cambios</button>
+            <a href="{% url 'documents' %}" role="button" class="secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
