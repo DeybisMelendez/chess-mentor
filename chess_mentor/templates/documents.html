@@ -34,9 +34,9 @@
     </div>
 
     {% if documents %}
-    <div class="grid">
+    <div style="display: flex; flex-wrap:wrap; justify-content: center;">
         {% for doc in documents %}
-        <article>
+        <article style= "max-width: 400px; width: 100%; margin: 1rem;">
                 <header>
                     <h3>
                         <a href="{{ doc.file.url }}" target="_blank">{{ doc.title }}</a>
