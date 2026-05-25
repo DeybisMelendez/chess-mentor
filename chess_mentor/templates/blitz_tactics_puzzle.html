@@ -340,6 +340,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // Comparar con solución
                 if (played !== expected) {
+                    if (game.in_checkmate()) {
+                        statusEl.textContent = "✅ ¡Jaque mate! Solución alternativa";
+                        submit(true);
+                        return;
+                    }
                     failed = true;
                     game.undo();
                     setAction("snapback");
