@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Auto-Análisis{% endblock %}
+
+{% block content %}
+
+<script type="module" src="https://unpkg.com/chessboard-element/bundled/chessboard-element.bundled.js"></script>
+
+<article>
+    <header style="text-align: center;">
+        <h3>Tablero de Auto-Análisis</h3>
+        <p>Usa las piezas de repuesto en los laterales. Arrastra al tablero para agregar. Suelta fuera para eliminar.</p>
+    </header>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 2rem; padding-top: 1rem;">
+
+        <chess-board
+            id="analysis-board"
+            style="width: 100%; max-width: 480px;"
+            position="8/8/8/8/8/8/8/8"
+            orientation="white"
+            draggable-pieces
+            spare-pieces
+            drop-off-board="trash">
+        </chess-board>
+
+        <div style="display: flex; gap: 1rem;">
+            <button id="reset-btn">Reiniciar posición</button>
+            <button id="clear-btn">Limpiar tablero</button>
+        </div>
+
+        <p id="fen-display" style="font-family: monospace; font-size: 0.875rem; color: var(--pico-muted-color);"></p>
+    </div>
+</article>
+
+<style>
+    #analysis-board {
+        margin: 2rem 0;
+        aspect-ratio: auto;
+        min-height: 560px;
+    }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    const board = document.getElementById("analysis-board");
+    const fenDisplay = document.getElementById("fen-display");
+    const resetBtn = document.getElementById("reset-btn");
+    const clearBtn = document.getElementById("clear-btn");
+
+    function updateFenDisplay() {
+        fenDisplay.textContent = board.position;
+    }
+
+    board.addEventListener("change", () => {
+        updateFenDisplay();
+    });
+
+    resetBtn.addEventListener("click", () => {
+        board.start();
+        updateFenDisplay();
+    });
+
+    clearBtn.addEventListener("click", () => {
+        board.clear();
+        updateFenDisplay();
+    });
+
+    updateFenDisplay();
+});
+</script>
+
+{% endblock %}

@@ -46,4 +46,7 @@ urlpatterns = [
          views.document_delete, name="document_delete"),
     path("documents/categories/", views.categories_list, name="categories"),
     path("documents/tags/", views.tags_list, name="tags"),
+
+    # Analysis
+    path("analysis/", views.analysis, name="analysis"),
 ]

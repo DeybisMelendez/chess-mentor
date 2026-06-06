@@ -1429,3 +1429,7 @@ def document_edit(request, document_id):
         "categories": categories,
         "tags": tags,
     })
+
+
+def analysis(request):
+    return render(request, "analysis.html")
