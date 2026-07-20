@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Entrenamiento libre | Puzzle{% endblock %}
+
+{% block content %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script type="module" src="https://unpkg.com/chessboard-element/bundled/chessboard-element.bundled.js"></script>
+
+<article>
+    <header style="text-align: center;">
+        <h3>Entrenamiento libre</h3>
+        <p>
+            {% if theme %}
+                Tema: <strong>{{ theme.name }}</strong>
+            {% else %}
+                Tema: <strong>Cualquiera</strong>
+            {% endif %}
+            | Rating del puzzle: <strong>{{ puzzle.rating }}</strong>
+        </p>
+        <p class="muted" style="font-size: 0.9rem;">
+            Dificultad: {{ rating_min }} - {{ rating_max }} (no afecta Elo)
+        </p>
+    </header>
+
+    <div style="text-align: center; margin: 0.5rem 0 1rem;">
+        <button id="skip-btn" type="button" class="outline">Saltar puzzle</button>
+        <a href="{% url 'free_training_start' %}" role="button" class="outline">Cambiar tema/dificultad</a>
+    </div>
+
+    <p id="status" style="text-align: center;"></p>
+    <div class="grid">
+        <div id="result" style="display: none;">
+            <div id="result-msg" style="text-align: center;"></div>
+
+            <div style="text-align: center; margin-top: 1rem;">
+                <button id="next-puzzle-btn" style="display: none;">
+                    Siguiente puzzle
+                </button>
+            </div>
+        </div>
+
+        <div>
+            <p id="turn-indicator" style="text-align: center; font-weight: bold;"></p>
+            <chess-board
+                style="width: 100%; max-width: 480px; height: auto; margin: auto; display: block;"
+                position="{{ puzzle.fen }}"
+                orientation="{{ puzzle.orientation }}"
+                draggable-pieces>
+            </chess-board>
+            <div style="text-align: center; margin-bottom: 0.5rem;">
+                <label>
+                    Auto promover al coronar:
+                    <select id="promotion-select">
+                        <option value="q">Dama</option>
+                        <option value="r">Torre</option>
+                        <option value="b">Alfil</option>
+                        <option value="n">Caballo</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+    </div>
+</article>
+
+{{ puzzle.moves|json_script:"solution-data" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    const PuzzleApp = (() => {
+
+        /* =======================
+         * Constantes del backend
+         * ======================= */
+        const PUZZLE_ID = "{{ puzzle.puzzle_id }}";
+        const SUBMIT_URL = "{% url 'free_training_submit' %}";
+        const SKIP_URL = "{% url 'free_training_skip' %}";
+        const CSRF_TOKEN = "{{ csrf_token }}";
+        const SOLUTION = JSON.parse(document.getElementById('solution-data').textContent);
+        const FEN = "{{ puzzle.fen|escapejs }}";
+
+        /* =======================
+         * Estado interno
+         * ======================= */
+        let game;
+        let moveIndex = 0;
+        let failed = false;
+        let submitted = false;
+
+        /* =======================
+         * Cache del DOM
+         * ======================= */
+        const board = document.querySelector("chess-board");
+        const statusEl = document.getElementById("status");
+        const turnEl = document.getElementById("turn-indicator");
+        const nextBtn = document.getElementById("next-puzzle-btn");
+        const skipBtn = document.getElementById("skip-btn");
+        const resultBox = document.getElementById("result");
+        const resultMsg = document.getElementById("result-msg");
+        const promotionSelect = document.getElementById("promotion-select");
+
+        /* =======================
+         * Highlight de movimientos
+         * ======================= */
+        const styleEl = document.createElement("style");
+        document.head.appendChild(styleEl);
+
+        function highlight(from, to, color) {
+            styleEl.textContent = `
+                chess-board::part(${from}),
+                chess-board::part(${to}) {
+                    box-shadow: inset 0 0 0 4px ${color};
+                }
+            `;
+        }
+
+        /* =======================
+         * Utilidades UI
+         * ======================= */
+        function updateTurn() {
+            turnEl.textContent =
+                game.turn() === "w"
+                    ? "Juegan blancas"
+                    : "Juegan negras";
+        }
+
+        function showResult(solved) {
+            resultBox.style.display = "block";
+            resultMsg.innerHTML = solved
+                ? "<h4>✅ Puzzle resuelto</h4>"
+                : "<h4>❌ Movimiento incorrecto</h4>";
+
+            if (solved) {
+                statusEl.textContent = "✅ Puzzle resuelto";
+            }
+
+            nextBtn.style.display = "inline-block";
+        }
+
+        /* =======================
+         * Submit
+         * ======================= */
+        function submit(solved) {
+            if (submitted) return;
+            submitted = true;
+
+            fetch(SUBMIT_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": CSRF_TOKEN
+                },
+                body: JSON.stringify({
+                    puzzle_id: PUZZLE_ID,
+                    solved: solved
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status !== "ok") return;
+                showResult(data.solved);
+            });
+        }
+
+        /* =======================
+         * Saltar puzzle
+         * ======================= */
+        function skip() {
+            if (submitted) return;
+
+            fetch(SKIP_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": CSRF_TOKEN
+                },
+                body: JSON.stringify({})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status !== "ok") return;
+                // Recargar muestra el nuevo puzzle activo.
+                window.location.reload();
+            });
+        }
+
+        /* =======================
+         * Ejecutar jugada (motor)
+         * ======================= */
+        function playMove(moveStr, color) {
+            const move = game.move({
+                from: moveStr.slice(0, 2),
+                to: moveStr.slice(2, 4),
+                promotion: moveStr[4]
+            });
+
+            board.setPosition(game.fen());
+            highlight(move.from, move.to, color);
+            updateTurn();
+            moveIndex++;
+        }
+
+        /* =======================
+         * Inicialización
+         * ======================= */
+        function init() {
+
+            game = new Chess(FEN);
+
+            statusEl.textContent = "Resuelve el puzzle";
+            updateTurn();
+
+            // Botón siguiente puzzle: recarga y muestra el nuevo activo.
+            nextBtn.addEventListener("click", () => {
+                window.location.reload();
+            });
+
+            // Botón saltar
+            skipBtn.addEventListener("click", () => {
+                skip();
+            });
+
+            // Primera jugada del rival
+            setTimeout(() => {
+                playMove(SOLUTION[moveIndex], "#2196f3");
+            }, 600);
+
+            /* ========= Drag start ========= */
+            board.addEventListener("drag-start", e => {
+                if (failed || game.game_over()) {
+                    e.preventDefault();
+                    return;
+                }
+
+                const { piece } = e.detail;
+                if (
+                    (game.turn() === "w" && piece.startsWith("b")) ||
+                    (game.turn() === "b" && piece.startsWith("w"))
+                ) {
+                    e.preventDefault();
+                }
+            });
+
+            /* ========= Drop ========= */
+            board.addEventListener("drop", e => {
+                const { source, target, setAction } = e.detail;
+
+                if (failed) {
+                    setAction("snapback");
+                    return;
+                }
+
+                const expected = SOLUTION[moveIndex];
+                const promotion = promotionSelect.value || "q";
+
+                const move = game.move({
+                    from: source,
+                    to: target,
+                    promotion: promotion
+                });
+
+                if (!move) {
+                    setAction("snapback");
+                    return;
+                }
+
+                const played =
+                    move.from +
+                    move.to +
+                    (move.promotion ? move.promotion : "");
+
+                if (played !== expected) {
+                    if (game.in_checkmate()) {
+                        statusEl.textContent = "✅ ¡Jaque mate! Solución alternativa";
+                        submit(true);
+                        return;
+                    }
+                    failed = true;
+                    game.undo();
+                    setAction("snapback");
+                    statusEl.textContent = "❌ Movimiento incorrecto";
+                    submit(false);
+                    return;
+                }
+
+                board.setPosition(game.fen());
+                highlight(move.from, move.to, "#ffc107");
+                updateTurn();
+                moveIndex++;
+
+                if (!SOLUTION[moveIndex]) {
+                    statusEl.textContent = "✅ Puzzle resuelto";
+                    submit(true);
+                    return;
+                }
+
+                setTimeout(() => {
+                    playMove(SOLUTION[moveIndex], "#2196f3");
+                }, 600);
+            });
+        }
+
+        return { init, submit };
+    })();
+
+    PuzzleApp.init();
+});
+</script>
+
+{% endblock %}

@@ -234,6 +234,31 @@ class ActiveExercise(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class FreeActiveExercise(models.Model):
+    """
+    Puzzle activo del modo de entrenamiento libre (no afecta el Elo).
+
+    Se diferencia de ``ActiveExercise`` para no interferir con el ciclo
+    semanal. Solo puede existir uno por usuario.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="free_active_exercise"
+    )
+    puzzle_id = models.CharField(max_length=100)
+    theme_lichess_name = models.CharField(
+        max_length=100,
+        help_text="Tema elegido (lichess_name) para obtener nuevos puzzles"
+    )
+    rating_min = models.PositiveIntegerField()
+    rating_max = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Free - {self.user} - {self.puzzle_id}"
+
+
 class RetryPuzzle(models.Model):
     """
     Puzzles fallados que deben repetirse

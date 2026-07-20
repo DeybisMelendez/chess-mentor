@@ -38,6 +38,15 @@ urlpatterns = [
     path("vision-rush/history/", views.vision_rush_history,
          name="vision_rush_history"),
 
+    # Entrenamiento libre (no afecta Elo)
+    path("free/", views.free_training_start, name="free_training_start"),
+    path("free/new/", views.free_training_new, name="free_training_new"),
+    path("free/puzzle/", views.free_training_puzzle,
+         name="free_training_puzzle"),
+    path("free/submit/", views.free_training_submit,
+         name="free_training_submit"),
+    path("free/skip/", views.free_training_skip, name="free_training_skip"),
+
     # Documents
     path("documents/", views.documents_list, name="documents"),
     path("documents/upload/", views.document_upload, name="document_upload"),

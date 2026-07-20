@@ -13,10 +13,11 @@ from django.utils.timezone import make_aware
 from django.views.decorators.http import require_POST
 
 from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
-                     Document, DocumentCategory, DocumentTag,
-                     Elo, PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
-                     ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPreferences, VisionRushSession, VisionRushAttempt)
+                     Document, DocumentCategory, DocumentTag, Elo,
+                     FreeActiveExercise, PuzzleAttempt, RetryPuzzle, Theme,
+                     ThemeCategory, ThemeElo, TrainingCycle,
+                     TrainingCycleTheme, TrainingPreferences,
+                     VisionRushSession, VisionRushAttempt)
 from .repository import LichessDB
 from .utils import (get_week_cycle_dates, get_weakest_themes, pick_cycle_theme,
                     select_blitz_puzzles, select_vision_rush_exercises)
@@ -1428,6 +1429,273 @@ def document_edit(request, document_id):
         "document": document,
         "categories": categories,
         "tags": tags,
+    })
+
+
+# =====================================================
+# Entrenamiento libre (no afecta Elo)
+# =====================================================
+
+# Dificultades con rangos absolutos de rating.
+FREE_RANGES = {
+    "easy":   (1500, 1700),
+    "medium": (1700, 1900),
+    "hard":   (1900, 2100),
+    "expert": (2100, 2800),
+}
+
+
+def _new_free_puzzle(theme_lichess_name, rating_min, rating_max):
+    """
+    Obtiene un puzzle libre desde la base de datos de Lichess.
+
+    Si no se encuentra con el tema elegido, se reintenta sin filtro de tema
+    dentro del mismo rango de rating.
+    """
+    db = LichessDB()
+
+    themes = [theme_lichess_name] if theme_lichess_name else []
+    puzzle = db.get_random_puzzle(
+        rating_min=rating_min,
+        rating_max=rating_max,
+        themes=themes,
+    )
+
+    if not puzzle:
+        # Fallback: sin filtro de tema.
+        puzzle = db.get_random_puzzle(
+            rating_min=rating_min,
+            rating_max=rating_max,
+            themes=None,
+        )
+
+    return puzzle
+
+
+@login_required
+def free_training_start(request):
+    """
+    Página de inicio del modo de entrenamiento libre.
+
+    Permite elegir un tema y una dificultad. Si ya existe un puzzle libre
+    activo, se ofrece la opción de continuar.
+    """
+    user = request.user
+
+    active = FreeActiveExercise.objects.filter(user=user).first()
+
+    # Precarga opcional vía query params (?theme=<id>&difficulty=easy)
+    initial_theme = request.GET.get("theme", "")
+    initial_difficulty = request.GET.get("difficulty", "easy")
+    if initial_difficulty not in FREE_RANGES:
+        initial_difficulty = "easy"
+
+    # Temas agrupados por categoría para el <select>
+    categories = (
+        ThemeCategory.objects
+        .prefetch_related("themes")
+        .order_by("name")
+    )
+
+    return render(
+        request,
+        "free_training_start.html",
+        {
+            "active": active,
+            "categories": categories,
+            "difficulties": FREE_RANGES,
+            "initial_theme": initial_theme,
+            "initial_difficulty": initial_difficulty,
+        },
+    )
+
+
+@login_required
+def free_training_new(request):
+    """
+    Crea un nuevo puzzle libre activo con el tema y dificultad elegidos.
+    """
+    if request.method != "POST":
+        return redirect("free_training_start")
+
+    user = request.user
+
+    theme_id = request.POST.get("theme_id")
+    difficulty = request.POST.get("difficulty", "easy")
+
+    if difficulty not in FREE_RANGES:
+        return redirect("free_training_start")
+
+    rating_min, rating_max = FREE_RANGES[difficulty]
+
+    theme = None
+    theme_lichess_name = ""
+    if theme_id:
+        theme = get_object_or_404(Theme, id=theme_id)
+        theme_lichess_name = theme.lichess_name
+
+    puzzle = _new_free_puzzle(theme_lichess_name, rating_min, rating_max)
+
+    if not puzzle:
+        return redirect("free_training_start")
+
+    # Reemplazar cualquier puzzle libre previo.
+    FreeActiveExercise.objects.filter(user=user).delete()
+    FreeActiveExercise.objects.create(
+        user=user,
+        puzzle_id=puzzle["puzzle_id"],
+        theme_lichess_name=theme_lichess_name,
+        rating_min=rating_min,
+        rating_max=rating_max,
+    )
+
+    return redirect("free_training_puzzle")
+
+
+@login_required
+def free_training_puzzle(request):
+    """
+    Muestra el puzzle libre activo.
+    """
+    user = request.user
+
+    active = FreeActiveExercise.objects.filter(user=user).first()
+    if not active:
+        return redirect("free_training_start")
+
+    db = LichessDB()
+    puzzle = db.get_puzzle_by_id(active.puzzle_id)
+
+    if not puzzle:
+        # Puzzle inválido: limpiar y volver al inicio.
+        active.delete()
+        return redirect("free_training_start")
+
+    theme = Theme.objects.filter(lichess_name=active.theme_lichess_name).first()
+
+    return render(
+        request,
+        "free_training_puzzle.html",
+        {
+            "puzzle": puzzle,
+            "theme": theme,
+            "rating_min": active.rating_min,
+            "rating_max": active.rating_max,
+        },
+    )
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def free_training_submit(request):
+    """
+    Procesa el resultado del puzzle libre.
+
+    Importante: NO actualiza Elo, ThemeElo, PuzzleAttempt, RetryPuzzle
+    ni el TrainingCycle. Solo libera el puzzle activo.
+    """
+    user = request.user
+    data = json.loads(request.body)
+
+    puzzle_id = data.get("puzzle_id")
+    solved = bool(data.get("solved"))
+
+    active = (
+        FreeActiveExercise.objects
+        .select_for_update()
+        .filter(user=user)
+        .first()
+    )
+
+    if not active or active.puzzle_id != puzzle_id:
+        return JsonResponse(
+            {"status": "error", "message": "Puzzle libre activo inválido"},
+            status=400,
+        )
+
+    # Mantener tema y rating para que el frontend pueda pedir "siguiente".
+    theme_lichess_name = active.theme_lichess_name
+    rating_min = active.rating_min
+    rating_max = active.rating_max
+
+    active.delete()
+
+    # Obtener nuevo puzzle libre (mismo tema y dificultad) para encadenar.
+    next_puzzle = _new_free_puzzle(theme_lichess_name, rating_min, rating_max)
+
+    if not next_puzzle:
+        return JsonResponse({
+            "status": "ok",
+            "solved": solved,
+            "next_puzzle": None,
+        })
+
+    FreeActiveExercise.objects.create(
+        user=user,
+        puzzle_id=next_puzzle["puzzle_id"],
+        theme_lichess_name=theme_lichess_name,
+        rating_min=rating_min,
+        rating_max=rating_max,
+    )
+
+    return JsonResponse({
+        "status": "ok",
+        "solved": solved,
+        "next_puzzle": next_puzzle["puzzle_id"],
+        "next_puzzle_url": "/free/puzzle/",
+    })
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def free_training_skip(request):
+    """
+    Descarta el puzzle libre actual y obtiene uno nuevo con el mismo
+    tema y dificultad. No cuenta como fallo.
+    """
+    user = request.user
+
+    active = (
+        FreeActiveExercise.objects
+        .select_for_update()
+        .filter(user=user)
+        .first()
+    )
+
+    if not active:
+        return JsonResponse(
+            {"status": "error", "message": "No active puzzle"},
+            status=400,
+        )
+
+    theme_lichess_name = active.theme_lichess_name
+    rating_min = active.rating_min
+    rating_max = active.rating_max
+
+    active.delete()
+
+    next_puzzle = _new_free_puzzle(theme_lichess_name, rating_min, rating_max)
+
+    if not next_puzzle:
+        return JsonResponse({
+            "status": "ok",
+            "next_puzzle": None,
+            "redirect": "/free/",
+        })
+
+    FreeActiveExercise.objects.create(
+        user=user,
+        puzzle_id=next_puzzle["puzzle_id"],
+        theme_lichess_name=theme_lichess_name,
+        rating_min=rating_min,
+        rating_max=rating_max,
+    )
+
+    return JsonResponse({
+        "status": "ok",
+        "next_puzzle": next_puzzle["puzzle_id"],
     })
 
 

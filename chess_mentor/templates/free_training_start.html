@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Entrenamiento libre{% endblock %}
+
+{% block content %}
+
+<article>
+    <header style="text-align: center;">
+        <h3>Entrenamiento libre</h3>
+        <p class="muted">
+            Resuelve puzzles por tema y dificultad. No afecta tu Elo ni el
+            ciclo semanal.
+        </p>
+    </header>
+
+    {% if active %}
+        <div style="text-align: center; margin: 1rem 0;">
+            <a role="button" href="{% url 'free_training_puzzle' %}">Continuar puzzle</a>
+        </div>
+        <hr>
+    {% endif %}
+
+    <form method="post" action="{% url 'free_training_new' %}">
+        {% csrf_token %}
+
+        <label for="theme_id">Tema</label>
+        <select id="theme_id" name="theme_id">
+            <option value="">Cualquier tema</option>
+            {% for category in categories %}
+                <optgroup label="{{ category.name }}">
+                    {% for theme in category.themes.all %}
+                        <option
+                            value="{{ theme.id }}"
+                            {% if theme.id|stringformat:"s" == initial_theme %}selected{% endif %}
+                        >
+                            {{ theme.name }}
+                        </option>
+                    {% endfor %}
+                </optgroup>
+            {% endfor %}
+        </select>
+
+        <label for="difficulty" style="margin-top: 1rem;">Dificultad</label>
+        <select id="difficulty" name="difficulty">
+            {% for key, range in difficulties.items %}
+                <option
+                    value="{{ key }}"
+                    {% if key == initial_difficulty %}selected{% endif %}
+                >
+                    {{ key|capfirst }} ({{ range.0 }} - {{ range.1 }})
+                </option>
+            {% endfor %}
+        </select>
+
+        <div style="text-align: center; margin-top: 1.5rem;">
+            <button type="submit">Empezar</button>
+        </div>
+    </form>
+</article>
+
+{% endblock %}
