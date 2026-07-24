@@ -888,24 +888,34 @@ def blitz_tactics_submit(request):
     # Actualizar Elo general y por temas (igual que en entrenamiento principal)
     db = LichessDB()
     puzzle_data = db.get_puzzle_by_id(puzzle_id)
-    
+
+    elo_changes = []
+
     if puzzle_data:
         puzzle_rating = puzzle_data["rating"]
         puzzle_themes = puzzle_data["themes"]
         score = 1.0 if solved else 0.0
-        
+
         # Actualizar Elo general
         user_elo = Elo.objects.select_for_update().get(user=user)
+        old_general = user_elo.elo
+
         user_elo.update_elo(
             opponent_elo=puzzle_rating,
             score=score,
         )
-        
+
+        elo_changes.append({
+            "name": "General",
+            "old": old_general,
+            "new": user_elo.elo,
+        })
+
         # Actualizar Elo por tema
         themes = Theme.objects.filter(
             lichess_name__in=puzzle_themes
         )
-        
+
         theme_elos = {
             te.theme_id: te
             for te in ThemeElo.objects.filter(
@@ -913,16 +923,24 @@ def blitz_tactics_submit(request):
                 theme__in=themes
             ).select_for_update()
         }
-        
+
         for theme in themes:
             theme_elo = theme_elos.get(theme.id)
             if not theme_elo:
                 continue  # por seguridad extrema
-            
+
+            old_elo = theme_elo.elo
+
             theme_elo.update_elo(
                 opponent_elo=puzzle_rating,
                 score=score,
             )
+
+            elo_changes.append({
+                "name": theme.name,
+                "old": old_elo,
+                "new": theme_elo.elo,
+            })
     
     # Registrar en PuzzleAttempt para historial general
     PuzzleAttempt.objects.create(
@@ -958,6 +976,8 @@ def blitz_tactics_submit(request):
     
     return JsonResponse({
         "status": "ok",
+        "solved": solved,
+        "elo_changes": elo_changes,
         "session_status": {
             "completed": session.completed,
             "is_active": session.is_active,

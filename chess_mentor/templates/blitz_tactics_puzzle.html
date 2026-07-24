@@ -179,11 +179,32 @@ document.addEventListener("DOMContentLoaded", () => {
                     : "Juegan negras";
         }
 
-        function showSessionResult(sessionStatus) {
-            console.log("showSessionResult called", sessionStatus);
+        function showSessionResult(sessionStatus, eloChanges, solved) {
+            console.log("showSessionResult called", sessionStatus, eloChanges, solved);
             resultBox.style.display = "block";
 
-            let html = "<strong>Resultado del puzzle</strong><br><br>";
+            let html = "";
+
+            // Cambios de Elo (estilo puzzle.html)
+            if (eloChanges && eloChanges.length > 0) {
+                html += `<h4>${solved ? '✅ Puzzle resuelto' : '❌ Movimiento incorrecto'}</h4>`;
+                html += `<p><strong>Cambios de Elo:</strong></p>`;
+                html += `<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: 1rem;">`;
+                eloChanges.forEach(c => {
+                    const delta = c.new - c.old;
+                    html += `
+                        <div>
+                            ${c.name}: ${c.old} → <strong>${c.new}</strong>
+                            <span style="color:${delta >= 0 ? "green" : "red"}">
+                                (${delta >= 0 ? "+" : ""}${delta})
+                            </span>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            html += "<br><strong>Estado de sesión</strong><br>";
             html += `Puzzles resueltos: <strong>${sessionStatus.score}</strong><br>`;
             html += `Fallos: <strong>${sessionStatus.failures}</strong><br>`;
             html += `Tiempo restante: <strong>${sessionStatus.time_remaining}s</strong><br>`;
@@ -241,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
                  // Actualizar fallos
                  failuresDisplay.textContent = data.session_status.failures;
 
-                 showSessionResult(data.session_status);
+                 showSessionResult(data.session_status, data.elo_changes, data.solved);
 
                  // Si la sesión sigue activa, el botón siguiente recarga la página
                  if (data.session_status.is_active) {
