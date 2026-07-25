@@ -13,6 +13,7 @@ urlpatterns = [
     path("puzzle/submit/", views.submit_puzzle, name="submit_puzzle"),
     path("history/", views.puzzle_history, name="puzzle_history"),
     path("themes/", views.theme_overview, name="theme_overview"),
+    path("progress/", views.elo_progress, name="elo_progress"),
 
     # Blitz Tactics
     path("blitz-tactics/", views.blitz_tactics_start, name="blitz_tactics_start"),

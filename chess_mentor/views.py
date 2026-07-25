@@ -14,13 +14,32 @@ from django.views.decorators.http import require_POST
 
 from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      Document, DocumentCategory, DocumentTag, Elo,
-                     FreeActiveExercise, PuzzleAttempt, RetryPuzzle, Theme,
-                     ThemeCategory, ThemeElo, TrainingCycle,
-                     TrainingCycleTheme, TrainingPreferences,
+                     EloSnapshot, FreeActiveExercise, PuzzleAttempt,
+                     RetryPuzzle, Theme, ThemeCategory, ThemeElo,
+                     TrainingCycle, TrainingCycleTheme, TrainingPreferences,
                      VisionRushSession, VisionRushAttempt)
 from .repository import LichessDB
 from .utils import (get_week_cycle_dates, get_weakest_themes, pick_cycle_theme,
                     select_blitz_puzzles, select_vision_rush_exercises)
+
+
+def _save_elo_snapshot(user):
+    """Guarda o actualiza el snapshot diario de Elo del usuario."""
+    today = date.today()
+    theme_elos = ThemeElo.objects.filter(user=user).select_related("theme")
+    theme_elos_dict = {
+        te.theme.name: te.elo for te in theme_elos
+    }
+    global_elo = Elo.objects.get(user=user).elo
+
+    EloSnapshot.objects.update_or_create(
+        user=user,
+        date=today,
+        defaults={
+            "global_elo": global_elo,
+            "theme_elos": theme_elos_dict,
+        }
+    )
 
 
 @login_required
@@ -264,6 +283,8 @@ def submit_puzzle(request):
             "old": old_elo,
             "new": theme_elo.elo,
         })
+
+    _save_elo_snapshot(user)
 
     return JsonResponse(
         {
@@ -941,7 +962,9 @@ def blitz_tactics_submit(request):
                 "old": old_elo,
                 "new": theme_elo.elo,
             })
-    
+
+    _save_elo_snapshot(user)
+
     # Registrar en PuzzleAttempt para historial general
     PuzzleAttempt.objects.create(
         user=user,
@@ -1721,3 +1744,95 @@ def free_training_skip(request):
 
 def analysis(request):
     return render(request, "analysis.html")
+
+
+@login_required
+def elo_progress(request):
+    user = request.user
+    today = date.today()
+
+    days_param = request.GET.get("days", "30")
+    try:
+        days = int(days_param)
+    except (ValueError, TypeError):
+        days = 30
+
+    cutoff = today - timedelta(days=days)
+
+    snapshots = (
+        EloSnapshot.objects
+        .filter(user=user, date__gte=cutoff)
+        .order_by("date")
+    )
+
+    ranges = [
+        (7, "7 días"),
+        (30, "30 días"),
+        (90, "90 días"),
+        (365, "1 año"),
+    ]
+
+    if not snapshots.exists():
+        return render(request, "elo_progress.html", {
+            "has_data": False,
+            "selected_days": days,
+            "ranges": ranges,
+        })
+
+    dates = [s.date.isoformat() for s in snapshots]
+    global_elos = [s.global_elo for s in snapshots]
+
+    all_themes = set()
+    for s in snapshots:
+        all_themes.update(s.theme_elos.keys())
+
+    theme_series = {}
+    for theme_name in sorted(all_themes):
+        series = []
+        for s in snapshots:
+            series.append(s.theme_elos.get(theme_name))
+        theme_series[theme_name] = series
+
+    themes_with_category = Theme.objects.filter(
+        name__in=all_themes
+    ).select_related("category").values("name", "category__name")
+
+    theme_categories = {
+        t["name"]: t["category__name"] or "Sin categoría"
+        for t in themes_with_category
+    }
+
+    weakest_theme_elos = (
+        ThemeElo.objects
+        .filter(user=user, theme__name__in=all_themes)
+        .select_related("theme")
+        .order_by("elo")[:3]
+    )
+    weakest_themes = [te.theme.name for te in weakest_theme_elos]
+
+    start_date, end_date = get_week_cycle_dates(today)
+    cycle = TrainingCycle.objects.filter(
+        user=user,
+        start_date=start_date,
+        end_date=end_date,
+    ).first()
+    cycle_theme_names = []
+    if cycle:
+        cycle_theme_names = list(
+            TrainingCycleTheme.objects
+            .filter(cycle=cycle)
+            .select_related("theme")
+            .values_list("theme__name", flat=True)
+        )
+
+    return render(request, "elo_progress.html", {
+        "has_data": True,
+        "selected_days": days,
+        "ranges": ranges,
+        "dates": dates,
+        "global_elos": global_elos,
+        "theme_series": theme_series,
+        "theme_categories": theme_categories,
+        "weakest_themes": weakest_themes,
+        "cycle_themes": cycle_theme_names,
+    })

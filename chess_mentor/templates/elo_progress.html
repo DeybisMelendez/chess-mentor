@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% block title %}Progreso Elo{% endblock %}
+
+{% block content %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<header style="text-align: center; margin-bottom: 2rem;">
+    <h1>Progreso Elo</h1>
+</header>
+
+{% if not has_data %}
+    <p style="text-align: center;">Aún no hay datos de progreso. Completa algunos puzzles para empezar a ver tu evolución.</p>
+{% else %}
+    {{ dates|json_script:"eloDates" }}
+    {{ global_elos|json_script:"globalElos" }}
+    {{ theme_series|json_script:"themeSeries" }}
+    {{ theme_categories|json_script:"themeCategories" }}
+    {{ weakest_themes|json_script:"weakestThemes" }}
+    {{ cycle_themes|json_script:"cycleThemes" }}
+
+    <div x-data="progressCharts()" style="margin-bottom: 2rem;">
+        <!-- Selector de rango -->
+        <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
+            {% for d, label in ranges %}
+                <a href="?days={{ d }}"
+                   role="button"
+                   class="{% if d == selected_days %}contrast{% else %}secondary{% endif %}"
+                   style="padding: 0.4rem 1rem; font-size: 0.85rem; text-decoration: none;">
+                    {{ label }}
+                </a>
+            {% endfor %}
+        </div>
+
+        <!-- Gráfico de Elo Global -->
+        <section style="margin-bottom: 2rem;">
+            <article>
+                <h3 style="text-align: center;">Elo General</h3>
+                <div style="height: 350px; position: relative;">
+                    <canvas id="globalEloChart"></canvas>
+                </div>
+            </article>
+        </section>
+
+        <!-- Gráfico de Elo por Tema -->
+        <section>
+            <article>
+                <h3 style="text-align: center;">Elo por Tema</h3>
+
+                <!-- Presets -->
+                <div class="preset-buttons" style="margin-bottom: 1rem;">
+                    <button type="button"
+                            class="outline preset-btn"
+                            :class="{ 'contrast': activePreset === 'weakest' }"
+                            @click="selectPreset('weakest')"
+                            x-show="weakestThemes.length > 0"
+                            style="font-size: 0.8rem;">
+                        3 m&aacute;s d&eacute;biles
+                    </button>
+                    <button type="button"
+                            class="outline preset-btn"
+                            :class="{ 'contrast': activePreset === 'cycle' }"
+                            @click="selectPreset('cycle')"
+                            x-show="cycleThemes.length > 0"
+                            style="font-size: 0.8rem;">
+                        Temas del ciclo
+                    </button>
+                    <button type="button"
+                            class="outline preset-btn"
+                            :class="{ 'contrast': activePreset === 'all' }"
+                            @click="selectPreset('all')"
+                            style="font-size: 0.8rem;">
+                        Todos los temas
+                    </button>
+                    <button type="button"
+                            class="outline preset-btn"
+                            @click="clearAll()"
+                            x-show="selectedThemes.length > 0"
+                            style="font-size: 0.8rem;">
+                        Limpiar
+                    </button>
+                </div>
+
+                <!-- Badges de temas seleccionados -->
+                <div class="selected-badges" x-show="selectedThemes.length > 0" style="margin-bottom: 0.75rem;">
+                    <small class="muted" style="margin-right: 0.5rem;">Seleccionados:</small>
+                    <template x-for="theme in selectedThemes" :key="theme">
+                        <span class="theme-badge-removable">
+                            <span x-text="theme"></span>
+                            <button type="button"
+                                    class="badge-remove"
+                                    @click="removeTheme(theme)"
+                                    title="Quitar">&times;</button>
+                        </span>
+                    </template>
+                </div>
+
+                <!-- Búsqueda y lista de temas -->
+                <details class="theme-selector-details" open>
+                    <summary>
+                        Buscar y seleccionar temas
+                        <small class="muted" x-text="'(' + selectedThemes.length + '/' + themeNames.length + ')'"></small>
+                    </summary>
+
+                    <div style="margin-top: 0.75rem;">
+                        <input type="search"
+                               placeholder="Filtrar temas..."
+                               x-model="search"
+                               class="theme-search-input"
+                               autocomplete="off">
+
+                        <!-- Lista agrupada por categoría -->
+                        <div class="theme-list" style="max-height: 300px; overflow-y: auto; margin-top: 0.5rem;">
+                            <template x-for="cat in visibleCategories" :key="cat.name">
+                                <div class="theme-category-group">
+                                    <div class="theme-category-header">
+                                        <strong x-text="cat.name"></strong>
+                                        <small class="muted" x-text="'(' + cat.matched + ')'"></small>
+                                    </div>
+                                    <div class="theme-category-items">
+                                        <template x-for="theme in cat.themes" :key="theme.name">
+                                            <label class="theme-checkbox-label"
+                                                   :class="{ 'theme-checkbox-hidden': !theme.visible }">
+                                                <input type="checkbox"
+                                                       :value="theme.name"
+                                                       :checked="isSelected(theme.name)"
+                                                       @change="toggleTheme(theme.name, $event.target.checked)">
+                                                <small x-text="theme.name"></small>
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                            <p class="muted" x-show="visibleCategories.length === 0" style="text-align: center; padding: 1rem;">
+                                Sin resultados para "<span x-text="search"></span>"
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Gráfico -->
+                <div style="height: 400px; position: relative; margin-top: 1.5rem;">
+                    <canvas id="themeEloChart"></canvas>
+                </div>
+                <p x-show="selectedThemes.length === 0" style="text-align: center; color: var(--pico-muted-color); margin-top: 0.5rem;">
+                    Selecciona al menos un tema para ver su progreso.
+                </p>
+            </article>
+        </section>
+    </div>
+
+    <script>
+    function progressCharts() {
+        return {
+            globalChart: null,
+            themeChart: null,
+            search: '',
+            selectedThemes: [],
+            themeNames: [],
+            themeCategories: {},
+            weakestThemes: [],
+            cycleThemes: [],
+            activePreset: '',
+
+            init() {
+                const dates = JSON.parse(document.getElementById('eloDates').textContent);
+                const globalElos = JSON.parse(document.getElementById('globalElos').textContent);
+                const themeSeries = JSON.parse(document.getElementById('themeSeries').textContent);
+
+                this.themeNames = Object.keys(themeSeries);
+                this.themeCategories = JSON.parse(document.getElementById('themeCategories').textContent);
+                this.weakestThemes = JSON.parse(document.getElementById('weakestThemes').textContent);
+                this.cycleThemes = JSON.parse(document.getElementById('cycleThemes').textContent);
+
+                this.selectedThemes = [];
+
+                this.buildGlobalChart(dates, globalElos);
+                this.buildThemeChart(dates, themeSeries);
+            },
+
+            get categorizedThemes() {
+                const cats = {};
+                for (const name of this.themeNames) {
+                    const cat = this.themeCategories[name] || 'Sin categoría';
+                    if (!cats[cat]) cats[cat] = [];
+                    cats[cat].push({ name, visible: true });
+                }
+                const result = [];
+                const order = ['Mediojuego', 'Jaque mate', 'Finales', 'Sin categoría'];
+                for (const catName of order) {
+                    if (cats[catName]) {
+                        result.push({ name: catName, themes: cats[catName] });
+                        delete cats[catName];
+                    }
+                }
+                for (const [catName, themes] of Object.entries(cats)) {
+                    result.push({ name: catName, themes });
+                }
+                return result;
+            },
+
+            get visibleCategories() {
+                const q = this.search.toLowerCase().trim();
+
+                if (!q) {
+                    return this.categorizedThemes.map(cat => ({
+                        ...cat,
+                        matched: cat.themes.length,
+                        themes: cat.themes.map(t => ({ ...t, visible: true }))
+                    }));
+                }
+
+                return this.categorizedThemes
+                    .map(cat => {
+                        const themes = cat.themes.map(t => ({
+                            ...t,
+                            visible: t.name.toLowerCase().includes(q) || cat.name.toLowerCase().includes(q)
+                        }));
+                        const matched = themes.filter(t => t.visible).length;
+                        return { ...cat, themes, matched };
+                    })
+                    .filter(cat => cat.matched > 0);
+            },
+
+            isSelected(themeName) {
+                return this.selectedThemes.includes(themeName);
+            },
+
+            toggleTheme(themeName, checked) {
+                if (checked) {
+                    if (!this.selectedThemes.includes(themeName)) {
+                        this.selectedThemes.push(themeName);
+                    }
+                } else {
+                    this.selectedThemes = this.selectedThemes.filter(t => t !== themeName);
+                }
+                this.activePreset = '';
+                this.updateThemeChart();
+            },
+
+            removeTheme(themeName) {
+                this.selectedThemes = this.selectedThemes.filter(t => t !== themeName);
+                this.activePreset = '';
+                this.updateThemeChart();
+            },
+
+            selectPreset(name) {
+                this.activePreset = name;
+                if (name === 'weakest') {
+                    this.selectedThemes = [...this.weakestThemes];
+                } else if (name === 'cycle') {
+                    this.selectedThemes = [...this.cycleThemes];
+                } else if (name === 'all') {
+                    this.selectedThemes = [...this.themeNames];
+                }
+                this.updateThemeChart();
+            },
+
+            clearAll() {
+                this.selectedThemes = [];
+                this.activePreset = '';
+                this.updateThemeChart();
+            },
+
+            buildGlobalChart(dates, globalElos) {
+                const ctx = document.getElementById('globalEloChart').getContext('2d');
+                this.globalChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: 'Elo General',
+                            data: globalElos,
+                            borderColor: '#2196f3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            pointHoverRadius: 6,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => 'Elo: ' + ctx.parsed.y
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: { display: false },
+                            },
+                            y: {
+                                display: true,
+                                beginAtZero: false,
+                            }
+                        }
+                    }
+                });
+            },
+
+            buildThemeChart(dates, themeSeries) {
+                const ctx = document.getElementById('themeEloChart').getContext('2d');
+                if (this.selectedThemes.length === 0) {
+                    if (this.themeChart) {
+                        this.themeChart.destroy();
+                        this.themeChart = null;
+                    }
+                    return;
+                }
+
+                const colors = [
+                    '#2196f3', '#e91e63', '#4caf50', '#ff9800', '#9c27b0',
+                    '#00bcd4', '#ff5722', '#795548', '#607d8b', '#cddc39',
+                    '#f44336', '#3f51b5', '#8bc34a', '#ffc107', '#009688',
+                ];
+
+                const datasets = this.selectedThemes.map((name, i) => ({
+                    label: name,
+                    data: themeSeries[name],
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: colors[i % colors.length] + '18',
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                }));
+
+                if (this.themeChart) {
+                    this.themeChart.destroy();
+                }
+
+                this.themeChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: datasets,
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 10,
+                                    font: { size: 11 },
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => ctx.dataset.label + ': ' + ctx.parsed.y
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: { display: false },
+                            },
+                            y: {
+                                display: true,
+                                beginAtZero: false,
+                            }
+                        }
+                    }
+                });
+            },
+
+            updateThemeChart() {
+                const dates = JSON.parse(document.getElementById('eloDates').textContent);
+                const themeSeries = JSON.parse(document.getElementById('themeSeries').textContent);
+                this.buildThemeChart(dates, themeSeries);
+            }
+        }
+    }
+    </script>
+{% endif %}
+
+{% endblock %}

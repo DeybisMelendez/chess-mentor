@@ -476,6 +476,34 @@ class VisionRushAttempt(models.Model):
         return f"Vision Rush Attempt - {'Solved' if self.solved else 'Failed'}"
 
 
+class EloSnapshot(models.Model):
+    """
+    Snapshot diario del Elo global y por tema del usuario.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="elo_snapshots"
+    )
+    date = models.DateField()
+    global_elo = models.IntegerField()
+    theme_elos = models.JSONField(
+        help_text="Diccionario {theme_name: elo_value} con el Elo de cada tema"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "date"],
+                name="unique_user_date_snapshot"
+            )
+        ]
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.user} - {self.date} - Elo {self.global_elo}"
+
+
 def validate_pdf_extension(value):
     from django.core.exceptions import ValidationError
     import os

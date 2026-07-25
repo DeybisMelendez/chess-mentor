@@ -190,6 +190,34 @@ article .stat-box__value--failed {
   border-radius: 0.25rem;
 }
 
+/* Line chart containers - full width for progress charts */
+.line-chart-container {
+  width: 100%;
+  position: relative;
+  margin: 0 auto;
+}
+
+.line-chart-container canvas {
+  display: block;
+  width: 100% !important;
+}
+
+/* Range selector buttons */
+.range-selector {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.range-selector a {
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  text-decoration: none;
+  border-radius: var(--pico-border-radius);
+}
+
 /* Priority badges */
 .priority-badge {
   padding: 0.25rem 0.75rem;
@@ -249,6 +277,125 @@ article .stat-box__value--failed {
   display: flex;
   list-style: none;
   gap: 0.5rem;
+}
+
+/* Preset buttons */
+.preset-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.preset-btn {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: var(--pico-border-radius);
+  cursor: pointer;
+}
+
+/* Selected theme badges */
+.selected-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: center;
+}
+
+.theme-badge-removable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--pico-color-blue-100);
+  color: var(--pico-color-blue-800);
+  border-radius: 1rem;
+  padding: 0.15rem 0.25rem 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.badge-remove {
+  background: none;
+  border: none;
+  color: var(--pico-color-blue-800);
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.badge-remove:hover {
+  opacity: 1;
+}
+
+/* Theme selector panel */
+.theme-selector-details {
+  margin-bottom: 0.5rem;
+}
+
+.theme-search-input {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.theme-list {
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  background: var(--pico-card-background-color);
+}
+
+.theme-category-group {
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.theme-category-group:last-child {
+  border-bottom: none;
+}
+
+.theme-category-header {
+  padding: 0.4rem 0.75rem;
+  background: var(--pico-secondary-background);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.theme-category-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.theme-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--pico-border-radius);
+  transition: background 0.15s;
+  font-size: 0.82rem;
+}
+
+.theme-checkbox-label small {
+  margin: auto;
+}
+
+.theme-checkbox-label:hover {
+  background: var(--pico-secondary-background);
+}
+
+.theme-checkbox-hidden {
+  display: none;
 }
 
 /* Margin utility classes (compatibility with existing templates) */

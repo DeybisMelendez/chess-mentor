@@ -566,27 +566,36 @@ def select_vision_rush_exercises(user):
                     correct_answer = str(count)
                 
                 elif ex_type == 'piece_square':
-                    # Elegir un tipo de pieza
-                    piece_types = [chesslib.PAWN, chesslib.KNIGHT, chesslib.BISHOP, 
-                                 chesslib.ROOK, chesslib.QUEEN, chesslib.KING]
-                    piece_type = random.choice(piece_types)
+                    # Contar piezas por tipo y color para identificar piezas únicas
+                    piece_counts = {}
+                    for sq in chesslib.SQUARES:
+                        piece = board.piece_at(sq)
+                        if piece:
+                            key = (piece.piece_type, piece.color)
+                            piece_counts[key] = piece_counts.get(key, 0) + 1
                     
-                    # 80% de probabilidad de usar el color que tiene el turno
-                    if random.random() < 0.8:
-                        color = turn_color
+                    # Solo piezas con exactamente una ocurrencia (sin ambigüedad)
+                    unique_pieces = [(pt, c) for (pt, c), count in piece_counts.items() if count == 1]
+                    
+                    if not unique_pieces:
+                        attempts += 1
+                        continue
+                    
+                    # Separar por el color que tiene el turno
+                    turn_unique = [(pt, c) for (pt, c) in unique_pieces if c == turn_color]
+                    other_unique = [(pt, c) for (pt, c) in unique_pieces if c != turn_color]
+                    
+                    # 80% de probabilidad de elegir del color que tiene el turno
+                    if turn_unique and random.random() < 0.8:
+                        piece_type, color = random.choice(turn_unique)
+                    elif turn_unique:
+                        piece_type, color = random.choice(turn_unique)
+                    elif other_unique:
+                        piece_type, color = random.choice(other_unique)
                     else:
-                        color = chesslib.BLACK if turn_color == chesslib.WHITE else chesslib.WHITE
+                        piece_type, color = random.choice(unique_pieces)
                     
                     square = find_piece_square(board, piece_type, color)
-                    if square is None:
-                        # Si no existe, intentar con el otro color
-                        other_color = chesslib.BLACK if color == chesslib.WHITE else chesslib.WHITE
-                        square = find_piece_square(board, piece_type, other_color)
-                        if square is None:
-                            # Si aún no existe, intentar de nuevo
-                            attempts += 1
-                            continue
-                        color = other_color
                     
                     piece_symbol = chesslib.piece_symbol(piece_type).upper()
                     side = 'w' if color == chesslib.WHITE else 'b'
