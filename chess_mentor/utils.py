@@ -67,20 +67,16 @@ def get_week_cycle_dates(today):
 
 def pick_cycle_theme(cycle_themes):
     """
-    Ponderación:
-    P1 → 50%
-    P2 → 30%
-    P3 → 20%
+    Ponderación proporcional inversa a la prioridad:
+    Prioridad 1 (más débil) recibe mayor peso.
+    Ej: con 10 temas → P1=10/55 (18%), P10=1/55 (2%)
     """
+    count = len(cycle_themes)
     weighted = []
 
     for ct in cycle_themes:
-        if ct.priority == 1:
-            weighted.extend([ct] * 5)
-        elif ct.priority == 2:
-            weighted.extend([ct] * 3)
-        elif ct.priority == 3:
-            weighted.extend([ct] * 2)
+        weight = count - ct.priority + 1
+        weighted.extend([ct] * weight)
 
     return random.choice(weighted)
 

@@ -68,7 +68,7 @@ def assign_cycle_themes(sender, instance, created, **kwargs):
     if theme_elos.count() < 1:
         return
 
-    weak_themes = theme_elos.order_by("elo", "theme_id")[:3]
+    weak_themes = theme_elos.order_by("elo", "theme_id")[:10]
     weak_theme_ids = weak_themes.values_list("theme_id", flat=True)
 
     objs = [

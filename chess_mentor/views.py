@@ -1806,7 +1806,7 @@ def elo_progress(request):
         ThemeElo.objects
         .filter(user=user, theme__name__in=all_themes)
         .select_related("theme")
-        .order_by("elo")[:3]
+        .order_by("elo")[:10]
     )
     weakest_themes = [te.theme.name for te in weakest_theme_elos]
 
