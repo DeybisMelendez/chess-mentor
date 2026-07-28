@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q, Sum, Avg
+from django.db.models import Count, F, Prefetch, Q, Sum, Avg
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
@@ -19,7 +19,7 @@ from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      TrainingCycle, TrainingCycleTheme, TrainingPreferences,
                      VisionRushSession, VisionRushAttempt)
 from .repository import LichessDB
-from .utils import (get_week_cycle_dates, get_weakest_themes, pick_cycle_theme,
+from .utils import (get_week_cycle_dates, get_weakest_themes,
                     select_blitz_puzzles, select_vision_rush_exercises)
 
 
@@ -99,27 +99,21 @@ def get_puzzle(request):
     # 3. Puzzle aleatorio de los temas del ciclo
     # --------------------------------------------------
     if not puzzle and cycle_themes.exists():
-        # Todos los temas del ciclo
-        cycle_theme_names = [
-            ct.theme.lichess_name
-            for ct in cycle_themes
-        ]
+        # Elegir un tema del ciclo con probabilidad uniforme
+        cycle_themes_list = list(cycle_themes)
+        chosen = random.choice(cycle_themes_list)
 
-        # Rating promedio de los temas del ciclo
-        theme_elos = ThemeElo.objects.filter(
-            user=user,
-            theme__in=[ct.theme for ct in cycle_themes]
-        )
-        base_elo = (
-            theme_elos.aggregate(avg=Avg("elo"))["avg"]
-            or 1200
-        )
+        # Elo especifico de ese tema
+        theme_elo = ThemeElo.objects.filter(
+            user=user, theme=chosen.theme
+        ).first()
+        base_elo = theme_elo.elo if theme_elo else 1200
 
-        # Ventana de ±100 puntos
+        # Ventana de +-100 puntos para ese tema
         puzzle = db.get_random_puzzle(
             rating_min=max(0, int(base_elo - 100)),
             rating_max=int(base_elo + 100),
-            themes=cycle_theme_names,
+            themes=[chosen.theme.lichess_name],
         )
 
     # --------------------------------------------------
@@ -197,18 +191,6 @@ def submit_puzzle(request):
     )
 
     if solved:
-        RetryPuzzle.objects.filter(
-            user=user,
-            puzzle_id=puzzle_id,
-        ).delete()
-    else:
-        RetryPuzzle.objects.update_or_create(
-            user=user,
-            puzzle_id=puzzle_id,
-            defaults={"fail_count": 1},
-        )
-
-    if solved:
         today = date.today()
         cycle = (
             TrainingCycle.objects
@@ -236,6 +218,33 @@ def submit_puzzle(request):
 
     puzzle_rating = puzzle_data["rating"]
     puzzle_themes = puzzle_data["themes"]
+
+    if solved:
+        RetryPuzzle.objects.filter(
+            user=user,
+            puzzle_id=puzzle_id,
+        ).delete()
+    else:
+        retry, created = RetryPuzzle.objects.get_or_create(
+            user=user,
+            puzzle_id=puzzle_id,
+            defaults={"fail_count": 1},
+        )
+
+        update_fields = {}
+        if not created:
+            update_fields["fail_count"] = F("fail_count") + 1
+
+        if puzzle_themes:
+            theme_obj = Theme.objects.filter(
+                lichess_name__in=puzzle_themes
+            ).first()
+            if theme_obj:
+                update_fields["theme"] = theme_obj
+
+        if update_fields:
+            RetryPuzzle.objects.filter(pk=retry.pk).update(**update_fields)
+
     score = 1.0 if solved else 0.0
 
     elo_changes = []
@@ -979,11 +988,25 @@ def blitz_tactics_submit(request):
             puzzle_id=puzzle_id,
         ).delete()
     else:
-        RetryPuzzle.objects.update_or_create(
+        retry, created = RetryPuzzle.objects.get_or_create(
             user=user,
             puzzle_id=puzzle_id,
             defaults={"fail_count": 1},
         )
+
+        update_fields = {}
+        if not created:
+            update_fields["fail_count"] = F("fail_count") + 1
+
+        if puzzle_themes:
+            theme_obj = Theme.objects.filter(
+                lichess_name__in=puzzle_themes
+            ).first()
+            if theme_obj:
+                update_fields["theme"] = theme_obj
+
+        if update_fields:
+            RetryPuzzle.objects.filter(pk=retry.pk).update(**update_fields)
     
     # Actualizar sesión
     if solved:
