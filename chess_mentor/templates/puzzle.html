@@ -20,8 +20,8 @@
                 <summary>Temas del ciclo (prioridad)</summary>
                 <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 0.5rem;">
                     {% for ct in themes %}
-                    <span class="priority-badge priority-{{ ct.priority }}">
-                        {{ ct.theme.name }} ({{ ct.priority }})
+                    <span class="priority-badge">
+                        {{ ct.theme.name }}
                     </span>
                     {% endfor %}
                 </div>

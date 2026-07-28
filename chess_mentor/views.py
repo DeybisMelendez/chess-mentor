@@ -326,7 +326,7 @@ def home(request):
         TrainingCycleTheme.objects
         .filter(cycle=cycle)
         .select_related("theme")
-        .order_by("priority")
+        .order_by("theme__name")
     )
 
     # Elos por categoría principal (promedio de temas de cada categoría)

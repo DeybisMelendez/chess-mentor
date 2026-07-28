@@ -224,56 +224,8 @@ article .stat-box__value--failed {
   border-radius: 1rem;
   font-size: 0.9rem;
   display: inline-block;
-}
-
-.priority-1 {
-  background: hsl(0, 70%, 90%);
-  color: hsl(0, 70%, 35%);
-}
-
-.priority-2 {
-  background: hsl(16, 70%, 90%);
-  color: hsl(16, 70%, 35%);
-}
-
-.priority-3 {
-  background: hsl(32, 70%, 90%);
-  color: hsl(32, 60%, 30%);
-}
-
-.priority-4 {
-  background: hsl(48, 70%, 90%);
-  color: hsl(48, 60%, 28%);
-}
-
-.priority-5 {
-  background: hsl(64, 60%, 90%);
-  color: hsl(64, 50%, 25%);
-}
-
-.priority-6 {
-  background: hsl(80, 55%, 90%);
-  color: hsl(80, 45%, 25%);
-}
-
-.priority-7 {
-  background: hsl(130, 55%, 90%);
-  color: hsl(130, 45%, 28%);
-}
-
-.priority-8 {
-  background: hsl(170, 55%, 90%);
-  color: hsl(170, 45%, 28%);
-}
-
-.priority-9 {
-  background: hsl(200, 60%, 90%);
-  color: hsl(200, 50%, 30%);
-}
-
-.priority-10 {
-  background: hsl(220, 60%, 90%);
-  color: hsl(220, 50%, 32%);
+  background: var(--pico-color-blue-100);
+  color: var(--pico-color-blue-800);
 }
 
 .theme-badge {

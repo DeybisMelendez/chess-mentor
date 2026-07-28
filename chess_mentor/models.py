@@ -116,11 +116,6 @@ class TrainingCycleTheme(models.Model):
     )
     theme = models.ForeignKey(Theme, on_delete=models.CASCADE)
 
-    priority = models.PositiveSmallIntegerField(
-        default=1,
-        help_text="1 = máxima prioridad"
-    )
-
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -130,7 +125,7 @@ class TrainingCycleTheme(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.cycle} - {self.theme} (P{self.priority})"
+        return f"{self.cycle} - {self.theme}"
 
 
 class BaseElo(models.Model):

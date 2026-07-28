@@ -69,15 +69,13 @@ def assign_cycle_themes(sender, instance, created, **kwargs):
         return
 
     weak_themes = theme_elos.order_by("elo", "theme_id")[:10]
-    weak_theme_ids = weak_themes.values_list("theme_id", flat=True)
 
     objs = [
         TrainingCycleTheme(
             cycle=instance,
             theme=theme_elo.theme,
-            priority=priority
         )
-        for priority, theme_elo in enumerate(weak_themes, start=1)
+        for theme_elo in weak_themes
     ]
 
     TrainingCycleTheme.objects.bulk_create(objs)

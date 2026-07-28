@@ -90,7 +90,7 @@ class ThemeCategoryAdmin(admin.ModelAdmin):
 class TrainingCycleThemeInline(admin.TabularInline):
     model = TrainingCycleTheme
     extra = 0
-    readonly_fields = ("theme", "priority")
+    readonly_fields = ("theme",)
     autocomplete_fields = ("theme",)
 
 
@@ -115,8 +115,8 @@ class TrainingCycleAdmin(admin.ModelAdmin):
 
 @admin.register(TrainingCycleTheme)
 class TrainingCycleThemeAdmin(admin.ModelAdmin):
-    list_display = ("cycle", "theme", "priority")
-    list_filter = ("priority", "theme")
+    list_display = ("cycle", "theme")
+    list_filter = ("theme",)
     search_fields = (
         "cycle__user__username",
         "cycle__user__email",
