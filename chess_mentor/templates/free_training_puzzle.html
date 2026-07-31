@@ -36,6 +36,9 @@
                 <button id="next-puzzle-btn" style="display: none;">
                     Siguiente puzzle
                 </button>
+                <button id="retry-puzzle-btn" style="display: none;" class="outline">
+                    Repetir puzzle
+                </button>
             </div>
         </div>
 
@@ -95,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const turnEl = document.getElementById("turn-indicator");
         const nextBtn = document.getElementById("next-puzzle-btn");
         const skipBtn = document.getElementById("skip-btn");
+        const retryBtn = document.getElementById("retry-puzzle-btn");
         const resultBox = document.getElementById("result");
         const resultMsg = document.getElementById("result-msg");
         const promotionSelect = document.getElementById("promotion-select");
@@ -135,12 +139,13 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             nextBtn.style.display = "inline-block";
+            retryBtn.style.display = "inline-block";
         }
 
         /* =======================
          * Submit
          * ======================= */
-        function submit(solved) {
+        function submit(solved, retry = false) {
             if (submitted) return;
             submitted = true;
 
@@ -152,7 +157,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
                 body: JSON.stringify({
                     puzzle_id: PUZZLE_ID,
-                    solved: solved
+                    solved: solved,
+                    retry: retry
                 })
             })
             .then(res => res.json())
@@ -213,6 +219,13 @@ document.addEventListener("DOMContentLoaded", () => {
             // Botón siguiente puzzle: recarga y muestra el nuevo activo.
             nextBtn.addEventListener("click", () => {
                 window.location.reload();
+            });
+
+            // Botón repetir puzzle: usa el endpoint de retry.
+            retryBtn.addEventListener("click", () => {
+                const retryUrl = "{% url 'free_training_retry' puzzle_id=puzzle.puzzle_id %}" +
+                    "?theme={{ theme_lichess_name }}&rating_min={{ rating_min }}&rating_max={{ rating_max }}";
+                window.location.href = retryUrl;
             });
 
             // Botón saltar

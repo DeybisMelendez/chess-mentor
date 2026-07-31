@@ -14,10 +14,11 @@ from django.views.decorators.http import require_POST
 
 from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      Document, DocumentCategory, DocumentTag, Elo,
-                     EloSnapshot, FreeActiveExercise, PuzzleAttempt,
-                     RetryPuzzle, Theme, ThemeCategory, ThemeElo,
-                     TrainingCycle, TrainingCycleTheme, TrainingPreferences,
-                     VisionRushSession, VisionRushAttempt)
+                     EloSnapshot, FreeActiveExercise, FreePuzzleAttempt,
+                     PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
+                     ThemeElo, TrainingCycle, TrainingCycleTheme,
+                     TrainingPreferences, VisionRushSession,
+                     VisionRushAttempt)
 from .repository import LichessDB
 from .utils import (get_week_cycle_dates, get_weakest_themes,
                     select_blitz_puzzles, select_vision_rush_exercises)
@@ -1648,6 +1649,7 @@ def free_training_puzzle(request):
         {
             "puzzle": puzzle,
             "theme": theme,
+            "theme_lichess_name": active.theme_lichess_name,
             "rating_min": active.rating_min,
             "rating_max": active.rating_max,
         },
@@ -1661,14 +1663,18 @@ def free_training_submit(request):
     """
     Procesa el resultado del puzzle libre.
 
-    Importante: NO actualiza Elo, ThemeElo, PuzzleAttempt, RetryPuzzle
-    ni el TrainingCycle. Solo libera el puzzle activo.
+    Registra el intento en FreePuzzleAttempt para el historial.
+    Si ``retry`` es true, mantiene el mismo puzzle activo para repetirlo.
+    En caso contrario, obtiene un nuevo puzzle (mismo tema y dificultad).
+
+    Importante: NO actualiza Elo, ThemeElo, ni el TrainingCycle.
     """
     user = request.user
     data = json.loads(request.body)
 
     puzzle_id = data.get("puzzle_id")
     solved = bool(data.get("solved"))
+    retry = bool(data.get("retry", False))
 
     active = (
         FreeActiveExercise.objects
@@ -1683,14 +1689,36 @@ def free_training_submit(request):
             status=400,
         )
 
-    # Mantener tema y rating para que el frontend pueda pedir "siguiente".
     theme_lichess_name = active.theme_lichess_name
     rating_min = active.rating_min
     rating_max = active.rating_max
 
+    FreePuzzleAttempt.objects.create(
+        user=user,
+        puzzle_id=puzzle_id,
+        solved=solved,
+        theme_lichess_name=theme_lichess_name,
+        rating_min=rating_min,
+        rating_max=rating_max,
+    )
+
     active.delete()
 
-    # Obtener nuevo puzzle libre (mismo tema y dificultad) para encadenar.
+    if retry:
+        FreeActiveExercise.objects.create(
+            user=user,
+            puzzle_id=puzzle_id,
+            theme_lichess_name=theme_lichess_name,
+            rating_min=rating_min,
+            rating_max=rating_max,
+        )
+
+        return JsonResponse({
+            "status": "ok",
+            "solved": solved,
+            "retry": True,
+        })
+
     next_puzzle = _new_free_puzzle(theme_lichess_name, rating_min, rating_max)
 
     if not next_puzzle:
@@ -1766,6 +1794,80 @@ def free_training_skip(request):
         "status": "ok",
         "next_puzzle": next_puzzle["puzzle_id"],
     })
+
+
+@login_required
+def free_training_history(request):
+    """
+    Historial de puzzles realizados en el modo de entrenamiento libre.
+    """
+    user = request.user
+
+    attempts = (
+        FreePuzzleAttempt.objects
+        .filter(user=user)
+        .order_by("-created_at")
+    )
+
+    total_count = attempts.count()
+    solved_count = attempts.filter(solved=True).count()
+    failed_count = total_count - solved_count
+
+    paginator = Paginator(attempts, 50)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "free_training_history.html",
+        {
+            "attempts": page_obj.object_list,
+            "page_obj": page_obj,
+            "total_count": total_count,
+            "solved_count": solved_count,
+            "failed_count": failed_count,
+        },
+    )
+
+
+@login_required
+def free_training_retry(request, puzzle_id):
+    """
+    Crea un FreeActiveExercise con el puzzle indicado para repetirlo
+    desde el historial o desde el puzzle actual.
+
+    Puede recibir query params opcionales ``theme`` y ``rating_min``/``rating_max``
+    para preservar el contexto de dificultad.
+    """
+    user = request.user
+
+    db = LichessDB()
+    puzzle = db.get_puzzle_by_id(puzzle_id)
+
+    if not puzzle:
+        return redirect("free_training_history")
+
+    theme_lichess_name = request.GET.get("theme", "")
+    rating_min = request.GET.get("rating_min", 400)
+    rating_max = request.GET.get("rating_max", 3100)
+
+    try:
+        rating_min = int(rating_min)
+        rating_max = int(rating_max)
+    except (ValueError, TypeError):
+        rating_min = 400
+        rating_max = 3100
+
+    FreeActiveExercise.objects.filter(user=user).delete()
+    FreeActiveExercise.objects.create(
+        user=user,
+        puzzle_id=puzzle_id,
+        theme_lichess_name=theme_lichess_name,
+        rating_min=rating_min,
+        rating_max=rating_max,
+    )
+
+    return redirect("free_training_puzzle")
 
 
 def analysis(request):

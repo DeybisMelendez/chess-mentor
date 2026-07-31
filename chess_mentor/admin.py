@@ -2,8 +2,9 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 
 from .models import (ActiveExercise, Document, DocumentCategory, DocumentTag, Elo,
-                     PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory, ThemeElo,
-                     TrainingCycle, TrainingCycleTheme, TrainingPreferences)
+                     FreePuzzleAttempt, PuzzleAttempt, RetryPuzzle, Theme,
+                     ThemeCategory, ThemeElo, TrainingCycle,
+                     TrainingCycleTheme, TrainingPreferences)
 
 User = get_user_model()
 
@@ -205,3 +206,22 @@ class DocumentAdmin(admin.ModelAdmin):
     readonly_fields = ("uploaded_by", "created_at")
     autocomplete_fields = ("category", "uploaded_by")
     list_select_related = ("category", "uploaded_by")
+
+
+@admin.register(FreePuzzleAttempt)
+class FreePuzzleAttemptAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "puzzle_id",
+        "solved",
+        "theme_lichess_name",
+        "rating_min",
+        "rating_max",
+        "created_at",
+    )
+    list_filter = ("solved", "created_at")
+    search_fields = ("user__username", "puzzle_id")
+    readonly_fields = ("created_at",)
+    autocomplete_fields = ("user",)
+    date_hierarchy = "created_at"
+    list_select_related = ("user",)

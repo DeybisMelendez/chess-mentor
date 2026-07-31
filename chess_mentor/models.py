@@ -229,6 +229,42 @@ class ActiveExercise(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class FreePuzzleAttempt(models.Model):
+    """
+    Historial de puzzles realizados en el modo de entrenamiento libre.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="free_puzzle_attempts"
+    )
+    puzzle_id = models.CharField(max_length=100)
+    solved = models.BooleanField()
+    theme_lichess_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Tema seleccionado al momento del intento"
+    )
+    rating_min = models.PositiveIntegerField(
+        help_text="Rating mínimo del rango de dificultad"
+    )
+    rating_max = models.PositiveIntegerField(
+        help_text="Rating máximo del rango de dificultad"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["puzzle_id"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Free - {self.user} - {self.puzzle_id} - {'OK' if self.solved else 'FAIL'}"
+
+
 class FreeActiveExercise(models.Model):
     """
     Puzzle activo del modo de entrenamiento libre (no afecta el Elo).

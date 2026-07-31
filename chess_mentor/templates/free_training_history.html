@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Historial libre{% endblock %}
+
+{% block content %}
+
+<h2>Historial de entrenamiento libre</h2>
+
+<p class="muted">Registro de puzzles realizados en modo libre (no afecta Elo).</p>
+
+<div class="stats-container">
+    <div class="stat-box">
+        <div class="stat-box__label">Total</div>
+        <div class="stat-box__value">{{ total_count }}</div>
+    </div>
+
+    <div class="stat-box stat-box--solved">
+        <div class="stat-box__label">Resueltos</div>
+        <div class="stat-box__value stat-box__value--solved">{{ solved_count }}</div>
+        <div class="stat-box__percentage">
+            {% if total_count > 0 %}
+                {% widthratio solved_count total_count 100 %}%
+            {% else %}
+                0%
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="stat-box stat-box--failed">
+        <div class="stat-box__label">Fallidos</div>
+        <div class="stat-box__value stat-box__value--failed">{{ failed_count }}</div>
+        <div class="stat-box__percentage">
+            {% if total_count > 0 %}
+                {% widthratio failed_count total_count 100 %}%
+            {% else %}
+                0%
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<hr>
+
+<div class="overflow-x-auto">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>ID Puzzle</th>
+                <th>Tema</th>
+                <th>Dificultad</th>
+                <th>Resultado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for attempt in attempts %}
+                <tr class="{% if attempt.solved %}bg-solved{% else %}bg-failed{% endif %}">
+                    <td>{{ attempt.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <code>{{ attempt.puzzle_id|truncatechars:10 }}</code>
+                    </td>
+                    <td>{{ attempt.theme_lichess_name|default:"Cualquiera" }}</td>
+                    <td>{{ attempt.rating_min }} - {{ attempt.rating_max }}</td>
+                    <td>
+                        {% if attempt.solved %}
+                            <span class="text-green font-weight-bold">Resuelto</span>
+                        {% else %}
+                            <span class="text-red font-weight-bold">Fallido</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a
+                            href="{% url 'free_training_retry' puzzle_id=attempt.puzzle_id %}?theme={{ attempt.theme_lichess_name }}&rating_min={{ attempt.rating_min }}&rating_max={{ attempt.rating_max }}"
+                            class="button-link"
+                        >Repetir</a>
+                        <a
+                            target="_blank"
+                            href="https://lichess.org/training/{{ attempt.puzzle_id }}"
+                            class="button-link"
+                        >Lichess</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center padding-2">
+                        No hay puzzles registrados en modo libre.
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj %}
+<nav class="pagination pagination-container">
+    <ul class="pagination-list">
+        {% if page_obj.has_previous %}
+            <li><a href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li><strong>{{ num }}</strong></li>
+            {% else %}
+                <li><a href="?page={{ num }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+            <li><a href="?page={{ page_obj.next_page_number }}">Siguiente</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% endblock %}

@@ -47,6 +47,10 @@ urlpatterns = [
     path("free/submit/", views.free_training_submit,
          name="free_training_submit"),
     path("free/skip/", views.free_training_skip, name="free_training_skip"),
+    path("free/history/", views.free_training_history,
+         name="free_training_history"),
+    path("free/retry/<str:puzzle_id>/", views.free_training_retry,
+         name="free_training_retry"),
 
     # Documents
     path("documents/", views.documents_list, name="documents"),
