@@ -1504,10 +1504,13 @@ def document_edit(request, document_id):
 
 # Dificultades con rangos absolutos de rating.
 FREE_RANGES = {
-    "easy":   (1500, 1700),
-    "medium": (1700, 1900),
-    "hard":   (1900, 2100),
-    "expert": (2100, 2800),
+    "principiante":  (399, 800),
+    "novato":       (800, 1200),
+    "intermedio":   (1200, 1600),
+    "avanzado":     (1600, 2000),
+    "experto":      (2000, 2400),
+    "maestro":      (2400, 2800),
+    "gran-maestro": (2800, 3100),
 }
 
 
@@ -1550,11 +1553,11 @@ def free_training_start(request):
 
     active = FreeActiveExercise.objects.filter(user=user).first()
 
-    # Precarga opcional vía query params (?theme=<id>&difficulty=easy)
+    # Precarga opcional vía query params (?theme=<id>&difficulty=principiante)
     initial_theme = request.GET.get("theme", "")
-    initial_difficulty = request.GET.get("difficulty", "easy")
+    initial_difficulty = request.GET.get("difficulty", "principiante")
     if initial_difficulty not in FREE_RANGES:
-        initial_difficulty = "easy"
+        initial_difficulty = "principiante"
 
     # Temas agrupados por categoría para el <select>
     categories = (

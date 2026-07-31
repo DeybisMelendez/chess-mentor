@@ -12,10 +12,10 @@ SQLITE_FILE = "lichess_puzzles.sqlite3"
 # Filtros simplificados
 # Máxima desviación permitida (menor = más estable)
 RATING_DEVIATION_THRESHOLD = 120
-RATING_MIN = 700                  # Rating mínimo (Elo)
-RATING_MAX = 3000                  # Rating máximo (Elo)
-MAX_TOTAL_PUZZLES = 500_000
-MAX_PUZZLES_PER_THEME = 12000      # Máximo de puzzles por tema
+RATING_MIN = 399                  # Rating mínimo (Elo)
+RATING_MAX = 3100                 # Rating máximo (Elo)
+MAX_TOTAL_PUZZLES = 510_000
+MAX_PUZZLES_PER_THEME = 14000      # Máximo de puzzles por tema
 BATCH_SIZE = 10000                 # Lotes para importación
 
 
