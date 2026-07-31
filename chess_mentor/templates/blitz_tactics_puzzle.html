@@ -2,6 +2,7 @@
 {% block title %}Blitz Tactics | Puzzle {{ current_puzzle }}/{{ total_puzzles }}{% endblock %}
 
 {% block content %}
+{% load static %}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script type="module" src="https://unpkg.com/chessboard-element/bundled/chessboard-element.bundled.js"></script>
@@ -139,6 +140,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let moveIndex = 0;
         let failed = false;
         let submitted = false;
+        let locked = false;
+        let audioUnlocked = false;
 
         /* =======================
          * Cache del DOM
@@ -153,6 +156,52 @@ document.addEventListener("DOMContentLoaded", () => {
         const promotionSelect = document.getElementById("promotion-select");
         const failuresDisplay = document.getElementById("failures-display");
         const puzzleGrid = document.getElementById("puzzle-grid");
+
+        /* =======================
+         * Sonidos
+         * ======================= */
+        const SOUNDS = {
+            move: new Audio("{% static 'sounds/Move.mp3' %}"),
+            capture: new Audio("{% static 'sounds/Capture.mp3' %}"),
+            castle: new Audio("{% static 'sounds/Castle.mp3' %}"),
+            check: new Audio("{% static 'sounds/Check.mp3' %}"),
+            promote: new Audio("{% static 'sounds/Promote.mp3' %}"),
+        };
+
+        function playSound(name) {
+            const audio = SOUNDS[name];
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(() => {});
+            }
+        }
+
+        function unlockAudio() {
+            if (audioUnlocked) return;
+            audioUnlocked = true;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (ctx.state === "suspended") ctx.resume();
+            Object.values(SOUNDS).forEach(audio => {
+                audio.load();
+                audio.play().then(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }).catch(() => {});
+            });
+        }
+
+        // Desbloquear audio en la primera interaccion del usuario con la pagina
+        ["click", "touchstart", "keydown"].forEach(evt => {
+            document.addEventListener(evt, unlockAudio, { once: true });
+        });
+
+        function getMoveSound(move) {
+            if (move.promotion) return "promote";
+            if (move.flags.includes("k") || move.flags.includes("q")) return "castle";
+            if (game.in_check() || game.in_checkmate()) return "check";
+            if (move.captured) return "capture";
+            return "move";
+        }
 
         /* =======================
          * Highlight de movimientos
@@ -233,6 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
              console.log("Submitting blitz puzzle", solved);
              if (submitted) return;
              submitted = true;
+             locked = true;
              stopTimer();
 
              const timeTaken = getTimeTaken();
@@ -287,6 +337,9 @@ document.addEventListener("DOMContentLoaded", () => {
             highlight(move.from, move.to, color);
             updateTurn();
             moveIndex++;
+            locked = false;
+
+            playSound(getMoveSound(move));
         }
 
         /* =======================
@@ -314,7 +367,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             /* ========= Drag start ========= */
             board.addEventListener("drag-start", e => {
-                if (failed || game.game_over()) {
+                unlockAudio();
+                if (locked || failed || submitted || game.game_over()) {
                     e.preventDefault();
                     return;
                 }
@@ -332,7 +386,7 @@ document.addEventListener("DOMContentLoaded", () => {
             board.addEventListener("drop", e => {
                 const { source, target, setAction } = e.detail;
 
-                if (failed) {
+                if (locked || failed || submitted) {
                     setAction("snapback");
                     return;
                 }
@@ -367,6 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         return;
                     }
                     failed = true;
+                    playSound(getMoveSound(move));
                     game.undo();
                     setAction("snapback");
                     statusEl.textContent = "❌ Movimiento incorrecto";
@@ -379,6 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 highlight(move.from, move.to, "#ffc107");
                 updateTurn();
                 moveIndex++;
+                playSound(getMoveSound(move));
 
                 // Puzzle resuelto
                 if (!SOLUTION[moveIndex]) {
@@ -388,6 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                  // Juega el rival
+                locked = true;
                 setTimeout(() => {
                     playMove(SOLUTION[moveIndex], "#2196f3");
                 }, 600);
