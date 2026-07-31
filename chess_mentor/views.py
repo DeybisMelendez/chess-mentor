@@ -330,123 +330,45 @@ def home(request):
         .order_by("theme__name")
     )
 
-    # Elos por categoría principal (promedio de temas de cada categoría)
-    from django.db.models import Avg
+    # Elos por categoría principal
     category_elos = (
         ThemeElo.objects
         .filter(
             user=user,
             theme__category__isnull=False
         )
-        .values('theme__category__lichess_name', 'theme__category__name')
+        .values('theme__category__lichess_name')
         .annotate(avg_elo=Avg('elo'))
-        .order_by('theme__category__name')
     )
-    
+
+    class SimpleElo:
+        def __init__(self, elo):
+            self.elo = elo
+
     elo_map = {}
-    category_labels = []
-    category_elos_list = []
     for item in category_elos:
         lichess_name = item['theme__category__lichess_name']
-        category_name = item['theme__category__name']
-        avg_elo = round(item['avg_elo'])
-        
-        # Para el gráfico de todas las categorías
-        category_labels.append(category_name)
-        category_elos_list.append(avg_elo)
-        
-        # Para la cuadrícula de las cuatro categorías principales
         if lichess_name in ['opening', 'middlegame', 'endgame', 'mate']:
-            class SimpleElo:
-                def __init__(self, elo):
-                    self.elo = elo
-            elo_map[lichess_name] = SimpleElo(avg_elo)
+            elo_map[lichess_name] = SimpleElo(round(item['avg_elo']))
 
-    category_data = {
-        "labels": category_labels,
-        "data": category_elos_list,
-    }
-
-    # =====================================================
-    # Estadísticas generales de puzzles
-    # =====================================================
-    puzzle_stats = PuzzleAttempt.objects.filter(user=user).aggregate(
-        total=Count('id'),
-        solved_count=Count('id', filter=Q(solved=True)),
-        failed_count=Count('id', filter=Q(solved=False)),
-    )
-    
-    total_puzzles = puzzle_stats['total'] or 0
-    solved_puzzles = puzzle_stats['solved_count'] or 0
-    failed_puzzles = puzzle_stats['failed_count'] or 0
-    
-    success_rate = 0
-    if total_puzzles > 0:
-        success_rate = round((solved_puzzles / total_puzzles) * 100, 1)
-
-    # =====================================================
-    # Progreso semanal (últimos 7 días)
-    # =====================================================
-    week_ago = today - timedelta(days=7)
-    weekly_stats = PuzzleAttempt.objects.filter(
-        user=user,
-        created_at__date__gte=week_ago,
-        created_at__date__lte=today
-    ).aggregate(
-        weekly_total=Count('id'),
-        weekly_solved_count=Count('id', filter=Q(solved=True)),
-    )
-    
-    weekly_total = weekly_stats['weekly_total'] or 0
-    weekly_solved = weekly_stats['weekly_solved_count'] or 0
-    
-    weekly_success_rate = 0
-    if weekly_total > 0:
-        weekly_success_rate = round((weekly_solved / weekly_total) * 100, 1)
-
-    # =====================================================
-    # Temas más débiles y más fuertes
-    # =====================================================
-    # Temas más débiles (menor Elo)
-    weakest_themes = ThemeElo.objects.filter(
-        user=user
-    ).select_related("theme").order_by("elo", "theme__name")[:5]
-    
-    # Temas más fuertes (mayor Elo)
-    strongest_themes = ThemeElo.objects.filter(
-        user=user
-    ).select_related("theme").order_by("-elo", "theme__name")[:5]
-
-    # =====================================================
-    # Progreso diario en el ciclo actual
-    # =====================================================
-    # Contar puzzles por día en el ciclo actual
-    daily_progress = []
-    if cycle:
-        cycle_start = cycle.start_date
-        cycle_end = cycle.end_date
-        
-        # Para simplificar, contamos puzzles por día en el ciclo
-        daily_counts = PuzzleAttempt.objects.filter(
+    # Merge cycle themes with their Elo values
+    cycle_theme_ids = [ct.theme_id for ct in cycle_themes]
+    elo_by_theme = {}
+    if cycle_theme_ids:
+        elo_records = ThemeElo.objects.filter(
             user=user,
-            created_at__date__gte=cycle_start,
-            created_at__date__lte=cycle_end
-        ).values('created_at__date').annotate(
-            daily_total=Count('id'),
-            daily_solved=Count('id', filter=Q(solved=True))
-        ).order_by('created_at__date')
-        
-        for day in daily_counts:
-            daily_progress.append({
-                'date': day['created_at__date'],
-                'total': day['daily_total'],
-                'solved': day['daily_solved'],
-                'failed': day['daily_total'] - day['daily_solved']
-            })
+            theme_id__in=cycle_theme_ids
+        ).values('theme_id', 'elo')
+        elo_by_theme = {r['theme_id']: r['elo'] for r in elo_records}
 
-    # =====================================================
-    # Progreso de Blitz Tactics en el ciclo actual
-    # =====================================================
+    cycle_themes_with_elo = []
+    for ct in cycle_themes:
+        cycle_themes_with_elo.append({
+            'name': ct.theme.name,
+            'elo': elo_by_theme.get(ct.theme_id, None),
+        })
+
+    # Blitz Tactics
     blitz_target = 5
     blitz_completed = BlitzTacticsSession.objects.filter(
         user=user,
@@ -454,13 +376,9 @@ def home(request):
         date__lte=cycle.end_date,
         completed=True
     ).count()
-    blitz_progress_percent = round((blitz_completed / blitz_target) * 100, 1) if blitz_target > 0 else 0
-    if blitz_progress_percent > 100:
-        blitz_progress_percent = 100
+    blitz_progress_percent = min(round((blitz_completed / blitz_target) * 100, 1), 100) if blitz_target > 0 else 0
 
-    # =====================================================
-    # Progreso de Vision Rush en el ciclo actual
-    # =====================================================
+    # Vision Rush
     vision_target = 5
     vision_completed = VisionRushSession.objects.filter(
         user=user,
@@ -468,20 +386,12 @@ def home(request):
         date__lte=cycle.end_date,
         completed=True
     ).count()
-    vision_progress_percent = round((vision_completed / vision_target) * 100, 1) if vision_target > 0 else 0
-    if vision_progress_percent > 100:
-        vision_progress_percent = 100
+    vision_progress_percent = min(round((vision_completed / vision_target) * 100, 1), 100) if vision_target > 0 else 0
 
-    # =====================================================
-    # Cálculo de días restantes en el ciclo
-    # =====================================================
-    days_remaining = (cycle.end_date - today).days
-    if days_remaining < 0:
-        days_remaining = 0
+    # Días restantes en el ciclo
+    days_remaining = max((cycle.end_date - today).days, 0)
 
-    # =====================================================
-    # Progreso del ciclo (porcentaje)
-    # =====================================================
+    # Progreso del ciclo
     cycle_progress_percent = 0
     if cycle.total_puzzles > 0:
         cycle_progress_percent = round((cycle.completed_puzzles / cycle.total_puzzles) * 100, 1)
@@ -493,27 +403,7 @@ def home(request):
         "middlegame": elo_map.get("middlegame"),
         "endgame": elo_map.get("endgame"),
         "mate": elo_map.get("mate"),
-        "cycle_themes": cycle_themes,
-        
-        # Categorías para gráfico radar
-        "category_data": category_data,
-        
-        # Estadísticas generales
-        "total_puzzles": total_puzzles,
-        "solved_puzzles": solved_puzzles,
-        "failed_puzzles": failed_puzzles,
-        "success_rate": success_rate,
-        
-        # Estadísticas semanales
-        "weekly_total": weekly_total,
-        "weekly_solved": weekly_solved,
-        "weekly_success_rate": weekly_success_rate,
-        
-        # Temas
-        "weakest_themes": weakest_themes,
-        "strongest_themes": strongest_themes,
-        
-        # Progreso del ciclo
+        "cycle_themes_with_elo": cycle_themes_with_elo,
         "days_remaining": days_remaining,
         "cycle_progress_percent": cycle_progress_percent,
         "blitz_target": blitz_target,
@@ -522,7 +412,6 @@ def home(request):
         "vision_target": vision_target,
         "vision_completed": vision_completed,
         "vision_progress_percent": vision_progress_percent,
-        "daily_progress": daily_progress,
     }
 
     return render(request, "home.html", context)

@@ -3,263 +3,125 @@
 
 {% block content %}
 
-<!-- Scripts para gráficos -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Datos para gráficos -->
-{{ cycle_progress_percent|json_script:"cycleProgressPercent" }}
-{{ success_rate|json_script:"successRateData" }}
-{{ weekly_success_rate|json_script:"weeklySuccessRateData" }}
-
-{{ category_data|json_script:"categoryData" }}
-
 <header style="text-align: center; margin-bottom: 2rem;">
-    <h1>Bienvenido, {{ user.username }}</h1>
-    <h2>Elo General: <strong>{{ elo.elo }}</strong></h2>
+    <h1>{{ user.username }}</h1>
+    <p style="font-size: 1.5rem;">
+        Elo General: <strong>{{ elo.elo }}</strong>
+    </p>
 </header>
 
-<!-- Sección de estadísticas principales -->
-<section class="grid" style="margin-bottom: 2rem;">
-    <article>
-        <h3>📊 Estadísticas de entrenamiento</h3>
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
-                <div style="font-size: 2rem; font-weight: bold; color: var(--pico-primary);">{{ total_puzzles }}</div>
-                <div>Puzzles totales</div>
-            </div>
-            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
-                <div style="font-size: 2rem; font-weight: bold; color: #2e7d32;">{{ success_rate }}%</div>
-                <div>Tasa de éxito</div>
-            </div>
-            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
-                <div style="font-size: 2rem; font-weight: bold; color: var(--pico-secondary);">{{ weekly_total }}</div>
-                <div>Puzzles esta semana</div>
-            </div>
-            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
-                <div style="font-size: 2rem; font-weight: bold; color: #2196f3;">{{ weekly_success_rate }}%</div>
-                <div>Éxito esta semana</div>
-            </div>
-        </div>
-    </article>
+<!-- Categorías -->
+<section style="margin-bottom: 2rem;">
+    <h3>Perfil de habilidades</h3>
+    <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+        <article style="text-align: center; padding: 1.25rem;">
+            <small style="display: block; margin-bottom: 0.25rem;">Apertura</small>
+            <strong style="font-size: 1.75rem;">{{ opening.elo|default:"—" }}</strong>
+        </article>
+        <article style="text-align: center; padding: 1.25rem;">
+            <small style="display: block; margin-bottom: 0.25rem;">Medio Juego</small>
+            <strong style="font-size: 1.75rem;">{{ middlegame.elo|default:"—" }}</strong>
+        </article>
+        <article style="text-align: center; padding: 1.25rem;">
+            <small style="display: block; margin-bottom: 0.25rem;">Final</small>
+            <strong style="font-size: 1.75rem;">{{ endgame.elo|default:"—" }}</strong>
+        </article>
+        <article style="text-align: center; padding: 1.25rem;">
+            <small style="display: block; margin-bottom: 0.25rem;">Mate</small>
+            <strong style="font-size: 1.75rem;">{{ mate.elo|default:"—" }}</strong>
+        </article>
+    </div>
 </section>
 
-<!-- Sección de ciclo actual -->
-<section class="grid" style="margin-bottom: 2rem;">
-    <article class="chart-article">
-        <h3>📅 Ciclo actual</h3>
-        
-        <!-- Gráfico de progreso del ciclo -->
-        <div class="chart-container" style="height: 200px; margin-top: 0.5rem;">
-            <canvas id="cycleProgressChart" style="margin:auto"></canvas>
-        </div>
-        
-        <!-- Información resumida del ciclo -->
-        <div style="margin-top: 1rem; text-align: center;">
-            <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
-                <div>
-                    <strong>Periodo:</strong><br>
-                    {{ cycle.start_date }} – {{ cycle.end_date }}
-                </div>
-                <div>
-                    <strong>Días restantes:</strong><br>
-                    {{ days_remaining }}
-                </div>
-                <div>
-                    <strong>Estado:</strong><br>
-                    {% if cycle.completed_puzzles >= cycle.total_puzzles %}
-                        <span style="color: #2e7d32;">✅ Completado</span>
-                    {% else %}
-                        <span style="color: #ff9800;">🔄 En progreso</span>
-                    {% endif %}
-                </div>
+<!-- Ciclo actual -->
+<section style="margin-bottom: 2rem;">
+    <h3>Ciclo actual</h3>
+    <article>
+        <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; margin-bottom: 1rem;">
+            <div>
+                <small style="color: var(--pico-muted-color);">{{ cycle.start_date }} — {{ cycle.end_date }}</small>
+            </div>
+            <div>
+                <small style="color: var(--pico-muted-color);">{{ days_remaining }} día{{ days_remaining|pluralize }} restante{{ days_remaining|pluralize }}</small>
+            </div>
+            <div>
+                {% if cycle.completed_puzzles >= cycle.total_puzzles %}
+                    <small style="color: #2e7d32;">Completado</small>
+                {% else %}
+                    <small style="color: var(--pico-muted-color);">En progreso</small>
+                {% endif %}
             </div>
         </div>
-        
-        <div style="margin-top: 1rem;">
-            <strong>Temas del ciclo (prioridad):</strong>
-            {% if cycle_themes %}
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
-                    {% for theme in cycle_themes %}
-                        <span class="priority-badge">
-                            {{ theme.theme.name }}
+
+        <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--pico-muted-color); margin-bottom: 0.25rem;">
+                <span>{{ cycle.completed_puzzles }} / {{ cycle.total_puzzles }} puzzles</span>
+                <span>{{ cycle_progress_percent }}%</span>
+            </div>
+            <progress value="{{ cycle_progress_percent }}" max="100" style="width: 100%;"></progress>
+        </div>
+
+        {% if cycle_themes_with_elo %}
+            <div>
+                <small style="display: block; margin-bottom: 0.5rem; color: var(--pico-muted-color);">Temas a entrenar esta semana:</small>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    {% for entry in cycle_themes_with_elo %}
+                        <span class="priority-badge" style="background: var(--pico-color-fuchsia-100); color: var(--pico-color-fuchsia-800);">
+                            {{ entry.name }}
+                            {% if entry.elo is not None %}
+                                <strong>{{ entry.elo }}</strong>
+                            {% endif %}
                         </span>
                     {% endfor %}
                 </div>
-            {% else %}
-                <p class="muted">No se detectan debilidades claras por ahora.</p>
-            {% endif %}
-        </div>
-    </article>
-    
-    <article class="chart-article">
-        <h3>🎯 Habilidades por categoría</h3>
-        <div class="chart-container chart-container-large" style="height: 300px;">
-            <canvas id="categoryRadarChart" style="margin:auto"></canvas>
-        </div>
-        <div style="margin-top: 1rem; text-align: center;">
-            <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
-                <div>
-                    <strong>Apertura:</strong> {{ opening.elo|default:"N/A" }}
-                </div>
-                <div>
-                    <strong>Medio juego:</strong> {{ middlegame.elo|default:"N/A" }}
-                </div>
-                <div>
-                    <strong>Final:</strong> {{ endgame.elo|default:"N/A" }}
-                </div>
-                <div>
-                    <strong>Mate:</strong> {{ mate.elo|default:"N/A" }}
-                </div>
             </div>
-        </div>
-    </article>
-</section>
-
-<!-- Sección de objetivos semanales -->
-<section class="grid" style="margin-bottom: 2rem;">
-    <article>
-        <h3>🎯 Objetivos semanales</h3>
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
-                <div style="font-size: 2rem; font-weight: bold; color: #2e7d32;">{{ cycle.completed_puzzles }} / {{ cycle.total_puzzles }}</div>
-                <div>Puzzles del ciclo</div>
-                <div style="font-size: 0.9rem; color: var(--pico-muted-color);">{{ cycle_progress_percent }}% completado</div>
-            </div>
-            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
-                <div style="font-size: 2rem; font-weight: bold; color: #2196f3;">{{ blitz_completed }} / {{ blitz_target }}</div>
-                <div>Sesiones de Blitz Tactics</div>
-                <div style="font-size: 0.9rem; color: var(--pico-muted-color);">{{ blitz_progress_percent }}% completado</div>
-            </div>
-            <div style="text-align: center; padding: 1rem; background: var(--pico-card-background-color); border-radius: 8px;">
-                <div style="font-size: 2rem; font-weight: bold; color: #9c27b0;">{{ vision_completed }} / {{ vision_target }}</div>
-                <div>Sesiones de Vision Rush</div>
-                <div style="font-size: 0.9rem; color: var(--pico-muted-color);">{{ vision_progress_percent }}% completado</div>
-            </div>
-        </div>
-    </article>
-</section>
-
-
-
-<!-- Sección de temas -->
-<section class="grid" style="margin-bottom: 2rem;">
-    <article>
-        <h3>📉 Temas más débiles</h3>
-        {% if weakest_themes %}
-            <ul style="list-style: none; padding: 0;">
-                {% for theme_elo in weakest_themes %}
-                    <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--pico-muted-border-color);">
-                        <strong>{{ theme_elo.theme.name }}</strong>
-                        <span style="float: right; color: #c62828;">
-                            Elo: {{ theme_elo.elo|default:"N/A" }}
-                        </span>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="muted">No hay temas entrenables registrados.</p>
-        {% endif %}
-    </article>
-    
-    <article>
-        <h3>📈 Temas más fuertes</h3>
-        {% if strongest_themes %}
-            <ul style="list-style: none; padding: 0;">
-                {% for theme_elo in strongest_themes %}
-                    <li style="padding: 0.5rem 0; border-bottom: 1px solid var(--pico-muted-border-color);">
-                        <strong>{{ theme_elo.theme.name }}</strong>
-                        <span style="float: right; color: #2e7d32;">
-                            Elo: {{ theme_elo.elo }}
-                        </span>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="muted">No hay temas entrenables registrados.</p>
         {% endif %}
     </article>
 </section>
 
-<!-- Botón de logout -->
+<!-- Objetivos de la semana -->
+<section style="margin-bottom: 2rem;">
+    <h3>Objetivos de la semana</h3>
+    <article>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+
+            <!-- Puzzles -->
+            <div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span>Puzzles del ciclo</span>
+                    <span>{{ cycle.completed_puzzles }} / {{ cycle.total_puzzles }} ({{ cycle_progress_percent }}%)</span>
+                </div>
+                <progress value="{{ cycle_progress_percent }}" max="100" style="width: 100%;"></progress>
+            </div>
+
+            <!-- Blitz Tactics -->
+            <div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span>Blitz Tactics</span>
+                    <span>{{ blitz_completed }} / {{ blitz_target }} ({{ blitz_progress_percent }}%)</span>
+                </div>
+                <progress value="{{ blitz_progress_percent }}" max="100" style="width: 100%;"></progress>
+            </div>
+
+            <!-- Vision Rush -->
+            <div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span>Vision Rush</span>
+                    <span>{{ vision_completed }} / {{ vision_target }} ({{ vision_progress_percent }}%)</span>
+                </div>
+                <progress value="{{ vision_progress_percent }}" max="100" style="width: 100%;"></progress>
+            </div>
+
+        </div>
+    </article>
+</section>
+
+<!-- Logout -->
 <div style="text-align: center; margin-top: 2rem;">
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
-        <button type="submit" style="background-color: var(--pico-secondary);">Cerrar sesión</button>
+        <button type="submit" class="secondary">Cerrar sesión</button>
     </form>
 </div>
-
-<!-- Script para inicializar gráficos -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // =====================================================
-    // 1. Gráfico de progreso del ciclo (Dona)
-    // =====================================================
-    const cycleProgressPercent = JSON.parse(document.getElementById('cycleProgressPercent').textContent);
-    const cycleProgressCtx = document.getElementById('cycleProgressChart').getContext('2d');
-    new Chart(cycleProgressCtx, {
-        type: 'doughnut',
-        data: {
-            datasets: [{
-                data: [cycleProgressPercent, 100 - cycleProgressPercent],
-                backgroundColor: ['#2e7d32', '#e0e0e0'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            cutout: '70%',
-            responsive: true,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return 'Progreso: ' + context.parsed + '%';
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    // =====================================================
-    // 2. Gráfico radar de categorías
-    // =====================================================
-    const categoryData = JSON.parse(document.getElementById('categoryData').textContent);
-    const categoryRadarCtx = document.getElementById('categoryRadarChart').getContext('2d');
-    new Chart(categoryRadarCtx, {
-        type: 'radar',
-        data: {
-            labels: categoryData.labels,
-            datasets: [{
-                label: 'Elo por categoría',
-                data: categoryData.data,
-                backgroundColor: 'rgba(33, 150, 243, 0.2)',
-                borderColor: 'rgba(33, 150, 243, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(33, 150, 243, 1)',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    ticks: { display: false },
-                    pointLabels: {
-                        font: { size: 12 }
-                    }
-                }
-            },
-            plugins: {
-                legend: { display: false }
-            }
-        }
-    });
-
-
-});
-</script>
 
 {% endblock %}
