@@ -10,6 +10,9 @@
 <article>
     <header style="text-align: center;">
         <h3>Entrenamiento libre</h3>
+        {% if is_shared %}
+            <p class="muted" style="font-size: 0.9rem;">Puzzle compartido</p>
+        {% endif %}
         <p>
             {% if theme %}
                 Tema: <strong>{{ theme.name }}</strong>
@@ -25,6 +28,7 @@
 
     <div style="text-align: center; margin: 0.5rem 0 1rem;">
         <button id="skip-btn" type="button" class="outline">Saltar puzzle</button>
+        <button id="share-btn" type="button" class="outline">Copiar enlace</button>
         <a href="{% url 'free_training_start' %}" role="button" class="outline">Cambiar tema/dificultad</a>
     </div>
 
@@ -82,6 +86,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const CSRF_TOKEN = "{{ csrf_token }}";
         const SOLUTION = JSON.parse(document.getElementById('solution-data').textContent);
         const FEN = "{{ puzzle.fen|escapejs }}";
+        const IS_SHARED = {% if is_shared %}true{% else %}false{% endif %};
+        const SHARE_URL = "{% url 'free_training_puzzle_detail' puzzle_id=puzzle.puzzle_id %}";
+        const NEXT_URL = "{% url 'free_training_puzzle' %}";
 
         /* =======================
          * Estado interno
@@ -102,6 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const nextBtn = document.getElementById("next-puzzle-btn");
         const skipBtn = document.getElementById("skip-btn");
         const retryBtn = document.getElementById("retry-puzzle-btn");
+        const shareBtn = document.getElementById("share-btn");
         const resultBox = document.getElementById("result");
         const resultMsg = document.getElementById("result-msg");
         const promotionSelect = document.getElementById("promotion-select");
@@ -236,7 +244,11 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(data => {
                 if (data.status !== "ok") return;
                 // Recargar muestra el nuevo puzzle activo.
-                window.location.reload();
+                if (IS_SHARED) {
+                    window.location.href = NEXT_URL;
+                } else {
+                    window.location.reload();
+                }
             });
         }
 
@@ -271,7 +283,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Botón siguiente puzzle: recarga y muestra el nuevo activo.
             nextBtn.addEventListener("click", () => {
-                window.location.reload();
+                if (IS_SHARED) {
+                    window.location.href = NEXT_URL;
+                } else {
+                    window.location.reload();
+                }
             });
 
             // Botón repetir puzzle: usa el endpoint de retry.
@@ -284,6 +300,17 @@ document.addEventListener("DOMContentLoaded", () => {
             // Botón saltar
             skipBtn.addEventListener("click", () => {
                 skip();
+            });
+
+            // Botón copiar enlace
+            shareBtn.addEventListener("click", () => {
+                const fullUrl = window.location.origin + SHARE_URL;
+                navigator.clipboard.writeText(fullUrl).then(() => {
+                    shareBtn.textContent = "Copiado";
+                    setTimeout(() => {
+                        shareBtn.textContent = "Copiar enlace";
+                    }, 2000);
+                });
             });
 
             // Primera jugada del rival

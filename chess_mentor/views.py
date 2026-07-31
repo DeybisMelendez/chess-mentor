@@ -1657,6 +1657,58 @@ def free_training_puzzle(request):
 
 
 @login_required
+def free_training_puzzle_detail(request, puzzle_id):
+    """
+    Muestra un puzzle libre especifico por ID, permitiendo compartir la URL.
+
+    Crea un FreeActiveExercise temporal para que el flujo de submit/skip
+    funcione sin cambios.
+    """
+    user = request.user
+
+    db = LichessDB()
+    puzzle = db.get_puzzle_by_id(puzzle_id)
+
+    if not puzzle:
+        return redirect("free_training_start")
+
+    theme_lichess_name = ""
+    theme = None
+    if puzzle.get("themes"):
+        for t in puzzle["themes"]:
+            theme = Theme.objects.filter(lichess_name=t).first()
+            if theme:
+                theme_lichess_name = t
+                break
+
+    rating = puzzle.get("rating", 1200)
+    rating_min = max(400, rating - 400)
+    rating_max = min(3100, rating + 400)
+
+    FreeActiveExercise.objects.filter(user=user).delete()
+    FreeActiveExercise.objects.create(
+        user=user,
+        puzzle_id=puzzle_id,
+        theme_lichess_name=theme_lichess_name,
+        rating_min=rating_min,
+        rating_max=rating_max,
+    )
+
+    return render(
+        request,
+        "free_training_puzzle.html",
+        {
+            "puzzle": puzzle,
+            "theme": theme,
+            "theme_lichess_name": theme_lichess_name,
+            "rating_min": rating_min,
+            "rating_max": rating_max,
+            "is_shared": True,
+        },
+    )
+
+
+@login_required
 @require_POST
 @transaction.atomic
 def free_training_submit(request):

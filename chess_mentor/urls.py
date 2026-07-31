@@ -42,6 +42,8 @@ urlpatterns = [
     # Entrenamiento libre (no afecta Elo)
     path("free/", views.free_training_start, name="free_training_start"),
     path("free/new/", views.free_training_new, name="free_training_new"),
+    path("free/puzzle/<str:puzzle_id>/", views.free_training_puzzle_detail,
+         name="free_training_puzzle_detail"),
     path("free/puzzle/", views.free_training_puzzle,
          name="free_training_puzzle"),
     path("free/submit/", views.free_training_submit,
