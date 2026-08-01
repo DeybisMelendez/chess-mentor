@@ -237,12 +237,6 @@ def submit_puzzle(request):
 
     active.delete()
 
-    PuzzleAttempt.objects.create(
-        user=user,
-        puzzle_id=puzzle_id,
-        solved=solved,
-    )
-
     if solved:
         today = date.today()
         cycle = (
@@ -271,6 +265,11 @@ def submit_puzzle(request):
 
     puzzle_rating = puzzle_data["rating"]
     puzzle_themes = puzzle_data["themes"]
+
+    was_retry = RetryPuzzle.objects.filter(
+        user=user,
+        puzzle_id=puzzle_id,
+    ).exists()
 
     if solved:
         RetryPuzzle.objects.filter(
@@ -345,6 +344,28 @@ def submit_puzzle(request):
             "old": old_elo,
             "new": theme_elo.elo,
         })
+
+    puzzle_theme = Theme.objects.filter(
+        lichess_name__in=puzzle_themes
+    ).first()
+
+    general_elo_change = next(
+        (e for e in elo_changes if e["name"] == "General"), None
+    )
+
+    PuzzleAttempt.objects.create(
+        user=user,
+        puzzle_id=puzzle_id,
+        solved=solved,
+        theme=puzzle_theme,
+        puzzle_rating=puzzle_rating,
+        elo_change=(
+            general_elo_change["new"] - general_elo_change["old"]
+            if general_elo_change else None
+        ),
+        mode="cycle",
+        is_retry=was_retry,
+    )
 
     _save_elo_snapshot(user)
 
@@ -473,157 +494,160 @@ def home(request):
 
 
 @login_required
-def puzzle_history(request):
+def puzzle_history(request, cycle_id=None):
     user = request.user
 
-    cycles = (
+    all_user_cycles = list(
         TrainingCycle.objects
         .filter(user=user)
         .order_by("-start_date")
     )
 
-    # Estadísticas por ciclo para la vista de resumen
-    cycles_with_stats = []
-    for cycle in cycles:
-        # Puzzles
-        start_dt = make_aware(
-            datetime.combine(cycle.start_date, datetime.min.time())
-        )
-        end_dt = make_aware(
-            datetime.combine(cycle.end_date, datetime.max.time())
-        )
-        puzzle_attempts = PuzzleAttempt.objects.filter(
-            user=user,
-            created_at__range=(start_dt, end_dt)
-        )
-        total_puzzles = puzzle_attempts.count()
-        solved_puzzles = puzzle_attempts.filter(solved=True).count()
-        failed_puzzles = total_puzzles - solved_puzzles
-        
-        # Blitz Tactics
-        blitz_sessions = BlitzTacticsSession.objects.filter(
-            user=user,
-            date__range=(cycle.start_date, cycle.end_date)
-        )
-        total_blitz_sessions = blitz_sessions.count()
-        total_blitz_solved = sum(session.score for session in blitz_sessions)
-        total_blitz_attempted = sum(session.total_puzzles for session in blitz_sessions)
-        
-        # Vision Rush
-        vision_sessions = VisionRushSession.objects.filter(
-            user=user,
-            date__range=(cycle.start_date, cycle.end_date)
-        )
-        total_vision_sessions = vision_sessions.count()
-        total_vision_solved = sum(session.score for session in vision_sessions)
-        total_vision_attempted = sum(session.total_exercises for session in vision_sessions)
-        
-        cycles_with_stats.append({
-            "cycle": cycle,
-            "puzzles": {
-                "total": total_puzzles,
-                "solved": solved_puzzles,
-                "failed": failed_puzzles,
-                "percentage": total_puzzles and (solved_puzzles / total_puzzles * 100),
-            },
-            "blitz_tactics": {
-                "sessions": total_blitz_sessions,
-                "solved": total_blitz_solved,
-                "attempted": total_blitz_attempted,
-                "percentage": total_blitz_attempted and (total_blitz_solved / total_blitz_attempted * 100),
-            },
-            "vision_rush": {
-                "sessions": total_vision_sessions,
-                "solved": total_vision_solved,
-                "attempted": total_vision_attempted,
-                "percentage": total_vision_attempted and (total_vision_solved / total_vision_attempted * 100),
-            },
+    if not all_user_cycles:
+        return render(request, "puzzle_history.html", {
+            "current_cycle": None,
+            "prev_cycle": None,
+            "next_cycle": None,
+            "cycle_count": 0,
         })
 
-    selected_cycle_id = request.GET.get("cycle")
-    selected_cycle = None
-    attempts = []
-    solved_count = 0
-    failed_count = 0
-    total_count = 0
-
-    if selected_cycle_id:
-        selected_cycle = get_object_or_404(
-            TrainingCycle,
-            id=selected_cycle_id,
-            user=user
+    if cycle_id is not None:
+        current_cycle = get_object_or_404(
+            TrainingCycle, id=cycle_id, user=user
         )
-
-        start_dt = make_aware(
-            datetime.combine(selected_cycle.start_date, datetime.min.time())
-        )
-        end_dt = make_aware(
-            datetime.combine(selected_cycle.end_date, datetime.max.time())
-        )
-
-        attempts = (
-            PuzzleAttempt.objects
-            .filter(
-                user=user,
-                created_at__range=(start_dt, end_dt)
-            )
-            .order_by("-created_at")
-        )
-        total_count = attempts.count()
-        solved_count = attempts.filter(solved=True).count()
-        failed_count = total_count - solved_count
-
-        # Paginación
-        paginator = Paginator(attempts, 50)
-        page_number = request.GET.get('page', 1)
-        page_obj = paginator.get_page(page_number)
-        attempts = page_obj.object_list
-        
-        # Estadísticas de Blitz Tactics y Vision Rush para el ciclo seleccionado
-        blitz_sessions = BlitzTacticsSession.objects.filter(
-            user=user,
-            date__range=(selected_cycle.start_date, selected_cycle.end_date)
-        )
-        total_blitz_sessions = blitz_sessions.count()
-        total_blitz_solved = sum(session.score for session in blitz_sessions)
-        total_blitz_attempted = sum(session.total_puzzles for session in blitz_sessions)
-        
-        vision_sessions = VisionRushSession.objects.filter(
-            user=user,
-            date__range=(selected_cycle.start_date, selected_cycle.end_date)
-        )
-        total_vision_sessions = vision_sessions.count()
-        total_vision_solved = sum(session.score for session in vision_sessions)
-        total_vision_attempted = sum(session.total_exercises for session in vision_sessions)
-        
-        blitz_stats = {
-            "sessions": total_blitz_sessions,
-            "solved": total_blitz_solved,
-            "attempted": total_blitz_attempted,
-            "percentage": total_blitz_attempted and (total_blitz_solved / total_blitz_attempted * 100),
-        }
-        vision_stats = {
-            "sessions": total_vision_sessions,
-            "solved": total_vision_solved,
-            "attempted": total_vision_attempted,
-            "percentage": total_vision_attempted and (total_vision_solved / total_vision_attempted * 100),
-        }
     else:
-        blitz_stats = None
-        vision_stats = None
-        page_obj = None
+        current_cycle = all_user_cycles[0]
+
+    # Navegación entre ciclos
+    cycles_asc = sorted(all_user_cycles, key=lambda c: c.start_date)
+    current_index = next(
+        i for i, c in enumerate(cycles_asc) if c.id == current_cycle.id
+    )
+    prev_cycle = cycles_asc[current_index - 1] if current_index > 0 else None
+    next_cycle = (
+        cycles_asc[current_index + 1]
+        if current_index < len(cycles_asc) - 1
+        else None
+    )
+
+    start_dt = make_aware(
+        datetime.combine(current_cycle.start_date, datetime.min.time())
+    )
+    end_dt = make_aware(
+        datetime.combine(current_cycle.end_date, datetime.max.time())
+    )
+
+    # --- Puzzles del entrenamiento (mode=cycle) ---
+    cycle_attempts_qs = (
+        PuzzleAttempt.objects
+        .filter(
+            user=user,
+            mode="cycle",
+            created_at__range=(start_dt, end_dt),
+        )
+        .select_related("theme")
+        .order_by("-created_at")
+    )
+    puzzle_total = cycle_attempts_qs.count()
+    puzzle_solved = cycle_attempts_qs.filter(solved=True).count()
+    puzzle_failed = puzzle_total - puzzle_solved
+
+    puzzle_paginator = Paginator(cycle_attempts_qs, 20)
+    puzzle_page_number = request.GET.get("puzzles_page", 1)
+    puzzle_page_obj = puzzle_paginator.get_page(puzzle_page_number)
+
+    # --- Puzzles de Blitz (mode=blitz, para stats) ---
+    blitz_attempts_qs = PuzzleAttempt.objects.filter(
+        user=user,
+        mode="blitz",
+        created_at__range=(start_dt, end_dt),
+    )
+    blitz_attempt_total = blitz_attempts_qs.count()
+    blitz_attempt_solved = blitz_attempts_qs.filter(solved=True).count()
+
+    # --- Sesiones Blitz Tactics ---
+    blitz_sessions = list(
+        BlitzTacticsSession.objects
+        .filter(
+            user=user,
+            date__range=(current_cycle.start_date, current_cycle.end_date),
+        )
+        .order_by("-date")
+    )
+    blitz_total_solved = sum(s.score for s in blitz_sessions)
+    blitz_total_attempted = sum(s.total_puzzles for s in blitz_sessions)
+
+    # --- Sesiones Vision Rush ---
+    vision_sessions = list(
+        VisionRushSession.objects
+        .filter(
+            user=user,
+            date__range=(current_cycle.start_date, current_cycle.end_date),
+        )
+        .order_by("-date")
+    )
+    vision_total_solved = sum(s.score for s in vision_sessions)
+    vision_total_attempted = sum(s.total_exercises for s in vision_sessions)
+
+    # --- Entrenamiento libre ---
+    free_attempts_qs = (
+        FreePuzzleAttempt.objects
+        .filter(
+            user=user,
+            created_at__range=(start_dt, end_dt),
+        )
+        .order_by("-created_at")
+    )
+    free_total = free_attempts_qs.count()
+    free_solved = free_attempts_qs.filter(solved=True).count()
+    free_failed = free_total - free_solved
+
+    free_paginator = Paginator(free_attempts_qs, 10)
+    free_page_number = request.GET.get("free_page", 1)
+    free_page_obj = free_paginator.get_page(free_page_number)
 
     context = {
-        "cycles": cycles,
-        "cycles_with_stats": cycles_with_stats,
-        "selected_cycle": selected_cycle,
-        "attempts": attempts,
-        "solved_count": solved_count,
-        "failed_count": failed_count,
-        "total_count": total_count,
-        "page_obj": page_obj,
-        "blitz_stats": blitz_stats,
-        "vision_stats": vision_stats,
+        "current_cycle": current_cycle,
+        "prev_cycle": prev_cycle,
+        "next_cycle": next_cycle,
+        "cycle_count": len(all_user_cycles),
+        "current_cycle_index": current_index + 1,
+
+        # Puzzles del entrenamiento
+        "puzzle_attempts": puzzle_page_obj.object_list,
+        "puzzle_page_obj": puzzle_page_obj,
+        "puzzle_total": puzzle_total,
+        "puzzle_solved": puzzle_solved,
+        "puzzle_failed": puzzle_failed,
+        "puzzle_pct": puzzle_total and (puzzle_solved / puzzle_total * 100),
+
+        # Blitz Tactics
+        "blitz_sessions": blitz_sessions,
+        "blitz_sessions_count": len(blitz_sessions),
+        "blitz_total_solved": blitz_total_solved,
+        "blitz_total_attempted": blitz_total_attempted,
+        "blitz_pct": (
+            blitz_total_attempted
+            and (blitz_total_solved / blitz_total_attempted * 100)
+        ),
+
+        # Vision Rush
+        "vision_sessions": vision_sessions,
+        "vision_sessions_count": len(vision_sessions),
+        "vision_total_solved": vision_total_solved,
+        "vision_total_attempted": vision_total_attempted,
+        "vision_pct": (
+            vision_total_attempted
+            and (vision_total_solved / vision_total_attempted * 100)
+        ),
+
+        # Entrenamiento libre
+        "free_attempts": free_page_obj.object_list,
+        "free_page_obj": free_page_obj,
+        "free_total": free_total,
+        "free_solved": free_solved,
+        "free_failed": free_failed,
+        "free_pct": free_total and (free_solved / free_total * 100),
     }
 
     return render(request, "puzzle_history.html", context)
@@ -971,14 +995,35 @@ def blitz_tactics_submit(request):
                 "new": theme_elo.elo,
             })
 
-    _save_elo_snapshot(user)
+        # Registrar en PuzzleAttempt para historial general
+        puzzle_theme = Theme.objects.filter(
+            lichess_name__in=puzzle_themes
+        ).first()
 
-    # Registrar en PuzzleAttempt para historial general
-    PuzzleAttempt.objects.create(
-        user=user,
-        puzzle_id=puzzle_id,
-        solved=solved,
-    )
+        general_elo_change = next(
+            (e for e in elo_changes if e["name"] == "General"), None
+        )
+
+        was_blitz_retry = RetryPuzzle.objects.filter(
+            user=user,
+            puzzle_id=puzzle_id,
+        ).exists()
+
+        PuzzleAttempt.objects.create(
+            user=user,
+            puzzle_id=puzzle_id,
+            solved=solved,
+            theme=puzzle_theme,
+            puzzle_rating=puzzle_rating,
+            elo_change=(
+                general_elo_change["new"] - general_elo_change["old"]
+                if general_elo_change else None
+            ),
+            mode="blitz",
+            is_retry=was_blitz_retry,
+        )
+
+    _save_elo_snapshot(user)
     
     # Actualizar RetryPuzzle (para que aparezca en entrenamiento principal)
     if solved:
@@ -1052,49 +1097,6 @@ def blitz_tactics_results(request, session_id):
         "attempts": attempts,
     }
     return render(request, "blitz_tactics_results.html", context)
-
-
-@login_required
-def blitz_tactics_history(request):
-    """
-    Historial de sesiones de Blitz Tactics del usuario.
-    """
-    user = request.user
-    cycles = TrainingCycle.objects.filter(user=user).order_by("-start_date")
-    
-    selected_cycle_id = request.GET.get("cycle")
-    selected_cycle = None
-    sessions = BlitzTacticsSession.objects.filter(user=user).order_by("-date")
-    
-    if selected_cycle_id:
-        selected_cycle = get_object_or_404(
-            TrainingCycle,
-            id=selected_cycle_id,
-            user=user
-        )
-        start_dt = make_aware(
-            datetime.combine(selected_cycle.start_date, datetime.min.time())
-        )
-        end_dt = make_aware(
-            datetime.combine(selected_cycle.end_date, datetime.max.time())
-        )
-        sessions = sessions.filter(date__range=(selected_cycle.start_date, selected_cycle.end_date))
-    
-    total_sessions = sessions.count()
-    total_puzzles_solved = sum(session.score for session in sessions)
-    total_puzzles_attempted = sum(session.total_puzzles for session in sessions)
-    avg_score = total_sessions and total_puzzles_solved / total_sessions
-    
-    context = {
-        "cycles": cycles,
-        "selected_cycle": selected_cycle,
-        "sessions": sessions,
-        "total_sessions": total_sessions,
-        "total_puzzles_solved": total_puzzles_solved,
-        "total_puzzles_attempted": total_puzzles_attempted,
-        "avg_score": avg_score,
-    }
-    return render(request, "blitz_tactics_history.html", context)
 
 
 @login_required
@@ -1321,42 +1323,6 @@ def vision_rush_results(request, session_id):
     }
     return render(request, "vision_rush_results.html", context)
 
-
-@login_required
-def vision_rush_history(request):
-    """
-    Historial de sesiones de Vision Rush del usuario.
-    """
-    user = request.user
-    cycles = TrainingCycle.objects.filter(user=user).order_by("-start_date")
-    
-    selected_cycle_id = request.GET.get("cycle")
-    selected_cycle = None
-    sessions = VisionRushSession.objects.filter(user=user).order_by("-date")
-    
-    if selected_cycle_id:
-        selected_cycle = get_object_or_404(
-            TrainingCycle,
-            id=selected_cycle_id,
-            user=user
-        )
-        sessions = sessions.filter(date__range=(selected_cycle.start_date, selected_cycle.end_date))
-    
-    total_sessions = sessions.count()
-    total_exercises_solved = sum(session.score for session in sessions)
-    total_exercises_attempted = sum(session.total_exercises for session in sessions)
-    avg_score = total_sessions and total_exercises_solved / total_sessions
-    
-    context = {
-        "cycles": cycles,
-        "selected_cycle": selected_cycle,
-        "sessions": sessions,
-        "total_sessions": total_sessions,
-        "total_exercises_solved": total_exercises_solved,
-        "total_exercises_attempted": total_exercises_attempted,
-        "avg_score": avg_score,
-    }
-    return render(request, "vision_rush_history.html", context)
 
 
 def superuser_required(view_func):
@@ -1848,39 +1814,6 @@ def free_training_skip(request):
     })
 
 
-@login_required
-def free_training_history(request):
-    """
-    Historial de puzzles realizados en el modo de entrenamiento libre.
-    """
-    user = request.user
-
-    attempts = (
-        FreePuzzleAttempt.objects
-        .filter(user=user)
-        .order_by("-created_at")
-    )
-
-    total_count = attempts.count()
-    solved_count = attempts.filter(solved=True).count()
-    failed_count = total_count - solved_count
-
-    paginator = Paginator(attempts, 50)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
-
-    return render(
-        request,
-        "free_training_history.html",
-        {
-            "attempts": page_obj.object_list,
-            "page_obj": page_obj,
-            "total_count": total_count,
-            "solved_count": solved_count,
-            "failed_count": failed_count,
-        },
-    )
-
 
 @login_required
 def free_training_retry(request, puzzle_id):
@@ -1897,7 +1830,7 @@ def free_training_retry(request, puzzle_id):
     puzzle = db.get_puzzle_by_id(puzzle_id)
 
     if not puzzle:
-        return redirect("free_training_history")
+        return redirect("puzzle_history")
 
     theme_lichess_name = request.GET.get("theme", "")
     rating_min = request.GET.get("rating_min", 400)

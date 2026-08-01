@@ -267,10 +267,43 @@ class PuzzleAttempt(models.Model):
     solved = models.BooleanField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    theme = models.ForeignKey(
+        Theme,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Tema del puzzle"
+    )
+    puzzle_rating = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Rating Lichess del puzzle"
+    )
+    elo_change = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Cambio de Elo general tras este intento"
+    )
+    mode = models.CharField(
+        max_length=10,
+        choices=[
+            ("cycle", "Ciclo"),
+            ("blitz", "Blitz"),
+        ],
+        default="cycle",
+        help_text="Modo de entrenamiento en que se realizó"
+    )
+    is_retry = models.BooleanField(
+        default=False,
+        help_text="Si fue un puzzle reintentado"
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=["user", "created_at"]),
             models.Index(fields=["puzzle_id"]),
+            models.Index(fields=["user", "mode", "created_at"]),
+            models.Index(fields=["user", "theme", "created_at"]),
         ]
 
 

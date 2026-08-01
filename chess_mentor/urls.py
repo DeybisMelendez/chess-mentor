@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
@@ -13,6 +14,8 @@ urlpatterns = [
     path("puzzle/submit/", views.submit_puzzle, name="submit_puzzle"),
     # History and progress
     path("history/", views.puzzle_history, name="puzzle_history"),
+    path("history/<int:cycle_id>/", views.puzzle_history,
+         name="puzzle_history_cycle"),
     path("themes/", views.theme_overview, name="theme_overview"),
     path("progress/", views.elo_progress, name="elo_progress"),
 
@@ -29,7 +32,8 @@ urlpatterns = [
          name="blitz_tactics_submit"),
     path("blitz-tactics/results/<int:session_id>/",
          views.blitz_tactics_results, name="blitz_tactics_results"),
-    path("blitz-tactics/history/", views.blitz_tactics_history,
+    path("blitz-tactics/history/",
+         RedirectView.as_view(pattern_name="puzzle_history", permanent=True),
          name="blitz_tactics_history"),
 
     # Vision Rush
@@ -41,7 +45,8 @@ urlpatterns = [
          name="vision_rush_submit"),
     path("vision-rush/results/<int:session_id>/",
          views.vision_rush_results, name="vision_rush_results"),
-    path("vision-rush/history/", views.vision_rush_history,
+    path("vision-rush/history/",
+         RedirectView.as_view(pattern_name="puzzle_history", permanent=True),
          name="vision_rush_history"),
 
     # Entrenamiento libre (no afecta Elo)
@@ -54,7 +59,8 @@ urlpatterns = [
     path("free/submit/", views.free_training_submit,
          name="free_training_submit"),
     path("free/skip/", views.free_training_skip, name="free_training_skip"),
-    path("free/history/", views.free_training_history,
+    path("free/history/",
+         RedirectView.as_view(pattern_name="puzzle_history", permanent=True),
          name="free_training_history"),
     path("free/retry/<str:puzzle_id>/", views.free_training_retry,
          name="free_training_retry"),
