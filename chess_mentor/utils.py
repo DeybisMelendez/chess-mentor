@@ -92,9 +92,9 @@ def get_weakest_themes(user, limit=10):
     return [wt.theme for wt in weakest]
 
 
-def select_blitz_puzzles(user):
+def select_blitz_puzzles(user, puzzle_count=30):
     """
-    Selecciona 30 puzzles para el modo Blitz Tactics.
+    Selecciona puzzles para el modo Blitz Tactics.
     Basado en los 10 temas más débiles y rating del jugador -300 ±100.
     """
     from django.db.models import Avg
@@ -142,17 +142,17 @@ def select_blitz_puzzles(user):
     
     db = LichessDB()
     
-    # Estrategia: intentar obtener 30 puzzles de una vez
+    # Estrategia: intentar obtener los puzzles de una vez
     # 1. Con rating ajustado y temas específicos
     puzzles = db.get_random_puzzles(
         rating_min=rating_min,
         rating_max=rating_max,
         themes=theme_names,
-        limit=30
+        limit=puzzle_count
     )
     
     # 2. Si no hay suficientes, relajar rating (±150 en lugar de ±50)
-    if len(puzzles) < 30:
+    if len(puzzles) < puzzle_count:
         rating_min = max(DB_RATING_MIN, player_rating - 450)
         rating_max = min(DB_RATING_MAX, player_rating - 150)
         # Asegurar que rating_min <= rating_max
@@ -171,22 +171,7 @@ def select_blitz_puzzles(user):
             rating_min=rating_min,
             rating_max=rating_max,
             themes=theme_names,
-            limit=30 - len(puzzles)
-        )
-        # Filtrar duplicados
-        existing_ids = {p["puzzle_id"] for p in puzzles}
-        for puzzle in additional:
-            if puzzle["puzzle_id"] not in existing_ids:
-                puzzles.append(puzzle)
-                existing_ids.add(puzzle["puzzle_id"])
-    
-    # 3. Si aún no hay suficientes, permitir cualquier tema (mismo rating relajado)
-    if len(puzzles) < 30:
-        additional = db.get_random_puzzles(
-            rating_min=rating_min,
-            rating_max=rating_max,
-            themes=None,
-            limit=30 - len(puzzles)
+            limit=puzzle_count - len(puzzles)
         )
         # Filtrar duplicados
         existing_ids = {p["puzzle_id"] for p in puzzles}
@@ -196,7 +181,7 @@ def select_blitz_puzzles(user):
                 existing_ids.add(puzzle["puzzle_id"])
     
     # 4. Último recurso: cualquier puzzle en rango más amplio
-    if len(puzzles) < 30:
+    if len(puzzles) < puzzle_count:
         rating_min = max(DB_RATING_MIN, player_rating - 500)
         rating_max = min(DB_RATING_MAX, player_rating - 100)
         if rating_min > rating_max:
@@ -206,7 +191,7 @@ def select_blitz_puzzles(user):
             rating_min=rating_min,
             rating_max=rating_max,
             themes=None,
-            limit=30 - len(puzzles)
+            limit=puzzle_count - len(puzzles)
         )
         existing_ids = {p["puzzle_id"] for p in puzzles}
         for puzzle in additional:
@@ -214,8 +199,7 @@ def select_blitz_puzzles(user):
                 puzzles.append(puzzle)
                 existing_ids.add(puzzle["puzzle_id"])
     
-    # Solo necesitamos los IDs (asegurarnos de tener exactamente 30 o menos si no hay suficientes)
-    puzzle_ids = [p["puzzle_id"] for p in puzzles[:30]]
+    puzzle_ids = [p["puzzle_id"] for p in puzzles[:puzzle_count]]
     return puzzle_ids
 
 
@@ -373,9 +357,9 @@ def generate_random_position(min_pieces=5, max_pieces=10, exercise_number=1):
         return board
 
 
-def select_vision_rush_exercises(user):
+def select_vision_rush_exercises(user, exercise_count=15):
     """
-    Selecciona 15 ejercicios para el modo Vision Rush.
+    Selecciona ejercicios para el modo Vision Rush.
     Genera posiciones aleatorias y preguntas dinámicamente.
     """
     try:
@@ -453,13 +437,15 @@ def select_vision_rush_exercises(user):
         
         exercises = []
         attempts = 0
-        while len(exercises) < 15 and attempts < 50:
+        first_third = exercise_count // 3
+        second_third = 2 * exercise_count // 3
+        while len(exercises) < exercise_count and attempts < 50:
             try:
                 # Determinar rango de piezas basado en el número de ejercicios generados
                 exercises_count = len(exercises)
-                if exercises_count < 5:
+                if exercises_count < first_third:
                     min_pieces, max_pieces = 4, 6
-                elif exercises_count < 10:
+                elif exercises_count < second_third:
                     min_pieces, max_pieces = 6, 8
                 else:
                     min_pieces, max_pieces = 8, 10
@@ -631,10 +617,9 @@ def select_vision_rush_exercises(user):
                 attempts += 1
                 continue
         
-        if len(exercises) < 15:
+        if len(exercises) < exercise_count:
             print(f"Warning: Only generated {len(exercises)} exercises for Vision Rush", file=sys.stderr)
-            # Add fallback exercises to reach 15
-            while len(exercises) < 15:
+            while len(exercises) < exercise_count:
                 exercises.append({
                     "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
                     "question": {

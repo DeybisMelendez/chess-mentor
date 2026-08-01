@@ -18,6 +18,56 @@ class TrainingPreferences(models.Model):
         return f"Preferences - {self.user}"
 
 
+class TrainingPlanConfig(models.Model):
+    """
+    Configuración personalizada del plan de entrenamiento semanal.
+    Se crea bajo demanda; si no existe, se usan los defaults de la plataforma.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="training_plan_config"
+    )
+    is_active = models.BooleanField(
+        default=False,
+        help_text="Activar para usar configuración personalizada en lugar de los defaults"
+    )
+
+    puzzles_per_cycle = models.PositiveIntegerField(default=100)
+    themes_per_cycle = models.PositiveIntegerField(default=10)
+
+    theme_selection_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ("weakest", "Más débiles"),
+            ("custom", "Personalizado"),
+        ],
+        default="weakest",
+        help_text="Modo de selección de temas para el ciclo"
+    )
+    selected_themes = models.ManyToManyField(
+        "Theme",
+        blank=True,
+        help_text="Temas seleccionados (solo usado en modo Personalizado)"
+    )
+
+    blitz_puzzles = models.PositiveIntegerField(
+        default=30,
+        help_text="Cantidad de puzzles por sesión de Blitz Tactics"
+    )
+    vision_exercises = models.PositiveIntegerField(
+        default=15,
+        help_text="Cantidad de ejercicios por sesión de Vision Rush"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        status = "Activo" if self.is_active else "Inactivo"
+        return f"Plan - {self.user} ({status})"
+
+
 class ThemeCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     lichess_name = models.CharField(

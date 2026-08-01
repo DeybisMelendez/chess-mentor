@@ -4,7 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .models import (Elo, Theme, ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPreferences)
+                     TrainingPlanConfig, TrainingPreferences)
 
 User = get_user_model()
 
@@ -57,25 +57,42 @@ def assign_cycle_themes(sender, instance, created, **kwargs):
     if instance.themes.exists():
         return
 
+    config = TrainingPlanConfig.objects.filter(
+        user=instance.user,
+        is_active=True
+    ).first()
+
+    limit = config.themes_per_cycle if config else 10
+    mode = config.theme_selection_mode if config else "weakest"
+
     theme_elos = (
         ThemeElo.objects
-        .filter(
-            user=instance.user
-        )
+        .filter(user=instance.user)
         .select_related("theme")
     )
 
     if theme_elos.count() < 1:
         return
 
-    weak_themes = theme_elos.order_by("elo", "theme_id")[:10]
-
-    objs = [
-        TrainingCycleTheme(
-            cycle=instance,
-            theme=theme_elo.theme,
-        )
-        for theme_elo in weak_themes
-    ]
+    if mode == "custom" and config:
+        selected = list(config.selected_themes.all())
+        if selected:
+            objs = [
+                TrainingCycleTheme(cycle=instance, theme=theme)
+                for theme in selected
+            ]
+        else:
+            # Fallback: si no hay temas seleccionados, usar weakest
+            weak_themes = theme_elos.order_by("elo", "theme_id")[:limit]
+            objs = [
+                TrainingCycleTheme(cycle=instance, theme=te.theme)
+                for te in weak_themes
+            ]
+    else:
+        weak_themes = theme_elos.order_by("elo", "theme_id")[:limit]
+        objs = [
+            TrainingCycleTheme(cycle=instance, theme=te.theme)
+            for te in weak_themes
+        ]
 
     TrainingCycleTheme.objects.bulk_create(objs)

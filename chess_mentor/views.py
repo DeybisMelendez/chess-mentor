@@ -17,8 +17,9 @@ from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      EloSnapshot, FreeActiveExercise, FreePuzzleAttempt,
                      PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPreferences, VisionRushSession,
-                     VisionRushAttempt)
+                     TrainingPlanConfig, TrainingPreferences,
+                     VisionRushSession, VisionRushAttempt)
+from .forms import TrainingPlanConfigForm
 from .repository import LichessDB
 from .utils import (get_week_cycle_dates, get_weakest_themes,
                     select_blitz_puzzles, select_vision_rush_exercises)
@@ -43,6 +44,54 @@ def _save_elo_snapshot(user):
     )
 
 
+def _get_active_config(user):
+    """Devuelve la config activa del usuario o None si no hay o está inactiva."""
+    config = TrainingPlanConfig.objects.filter(
+        user=user,
+        is_active=True
+    ).first()
+    return config
+
+
+def _puzzles_per_cycle(user):
+    """Devuelve el número de puzzles por ciclo según la config o default."""
+    config = _get_active_config(user)
+    return config.puzzles_per_cycle if config else 100
+
+
+def _update_current_cycle(user, config):
+    """Actualiza el ciclo actual con la nueva configuración si existe."""
+    today = date.today()
+    cycle = TrainingCycle.objects.filter(
+        user=user,
+        start_date__lte=today,
+        end_date__gte=today,
+    ).first()
+    if not cycle:
+        return
+
+    if config.is_active:
+        cycle.total_puzzles = config.puzzles_per_cycle
+        cycle.save(update_fields=["total_puzzles"])
+
+        cycle.themes.all().delete()
+
+        limit = config.themes_per_cycle
+        if config.theme_selection_mode == "custom":
+            selected = list(config.selected_themes.all())
+            themes = selected
+        else:
+            weak = ThemeElo.objects.filter(
+                user=user
+            ).order_by("elo", "theme_id")[:limit]
+            themes = [te.theme for te in weak]
+
+        TrainingCycleTheme.objects.bulk_create([
+            TrainingCycleTheme(cycle=cycle, theme=theme)
+            for theme in themes
+        ])
+
+
 @login_required
 def get_puzzle(request):
     user = request.user
@@ -57,7 +106,10 @@ def get_puzzle(request):
     cycle, _ = TrainingCycle.objects.get_or_create(
         user=user,
         start_date=start_date,
-        end_date=end_date,
+        defaults={
+            "end_date": end_date,
+            "total_puzzles": _puzzles_per_cycle(user),
+        }
     )
 
     cycle_themes = cycle.themes.select_related("theme")
@@ -312,11 +364,13 @@ def home(request):
 
     start_date, end_date = get_week_cycle_dates(today)
 
-    # El ciclo se autocrea y configura vía signals
     cycle, _ = TrainingCycle.objects.get_or_create(
         user=user,
         start_date=start_date,
-        end_date=end_date,
+        defaults={
+            "end_date": end_date,
+            "total_puzzles": _puzzles_per_cycle(user),
+        }
     )
 
     # Elo general
@@ -635,6 +689,58 @@ def theme_overview(request):
 
 
 @login_required
+def training_plan_config(request):
+    """
+    Configuración personalizada del plan de entrenamiento semanal.
+    Permite al usuario activar/desactivar y ajustar puzzles por ciclo,
+    temas, Blitz Tactics y Vision Rush.
+    """
+    user = request.user
+    config, created = TrainingPlanConfig.objects.get_or_create(user=user)
+
+    if request.method == "POST":
+        form = TrainingPlanConfigForm(request.POST, instance=config)
+        if form.is_valid():
+            config = form.save()
+            _update_current_cycle(user, config)
+            return redirect("training_plan_config")
+    else:
+        form = TrainingPlanConfigForm(instance=config)
+
+    categories = (
+        ThemeCategory.objects
+        .prefetch_related("themes")
+        .order_by("name")
+    )
+
+    theme_elos_dict = {}
+    selected_theme_ids = []
+    if config.is_active:
+        elos = ThemeElo.objects.filter(user=user).values("theme_id", "elo")
+        theme_elos_dict = {str(e["theme_id"]): e["elo"] for e in elos}
+        selected_theme_ids = list(config.selected_themes.values_list("id", flat=True))
+
+    has_active_cycle = TrainingCycle.objects.filter(
+        user=user,
+        start_date__lte=date.today(),
+        end_date__gte=date.today(),
+    ).exists()
+
+    return render(
+        request,
+        "training_plan_config.html",
+        {
+            "form": form,
+            "config": config,
+            "categories": categories,
+            "theme_elos_dict": theme_elos_dict,
+            "selected_theme_ids": selected_theme_ids,
+            "has_active_cycle": has_active_cycle,
+        },
+    )
+
+
+@login_required
 def blitz_tactics_start(request):
     """
     Página de inicio del modo Blitz Tactics.
@@ -680,7 +786,9 @@ def blitz_tactics_new(request):
     if existing and existing.is_active:
         return redirect("blitz_tactics_puzzle")
 
-    puzzle_ids = select_blitz_puzzles(user)
+    config = _get_active_config(user)
+    blitz_count = config.blitz_puzzles if config else 30
+    puzzle_ids = select_blitz_puzzles(user, puzzle_count=blitz_count)
 
     session = BlitzTacticsSession.objects.create(
         user=user,
@@ -1034,7 +1142,9 @@ def vision_rush_new(request):
     if existing and existing.is_active:
         return redirect("vision_rush_puzzle")
 
-    exercises = select_vision_rush_exercises(user)
+    config = _get_active_config(user)
+    vr_count = config.vision_exercises if config else 15
+    exercises = select_vision_rush_exercises(user, exercise_count=vr_count)
 
     session = VisionRushSession.objects.create(
         user=user,

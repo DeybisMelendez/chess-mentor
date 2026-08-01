@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load dict_filters %}
+{% block title %}Configurar Plan de Entrenamiento{% endblock %}
+
+{% block content %}
+
+<article x-data="{ active: {{ config.is_active|lower }}, mode: '{{ config.theme_selection_mode }}' }">
+    <header style="text-align: center;">
+        <h3>Configurar Plan de Entrenamiento</h3>
+        <p class="muted">
+            Personaliza tu plan semanal de puzzles, temas y modos de entrenamiento.
+        </p>
+    </header>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <label>
+            <input type="checkbox" name="is_active" x-model="active"
+                   {% if config.is_active %}checked{% endif %}>
+            Usar plan personalizado
+        </label>
+        <small class="muted">Desactivado = se usan los defaults de la plataforma.</small>
+
+        <fieldset x-show="active">
+            <hgroup>
+                <h4>Plan Principal (ciclo semanal)</h4>
+                <small>Configura los puzzles y temas de tu ciclo semanal.</small>
+            </hgroup>
+
+            <label for="id_puzzles_per_cycle">Puzzles por ciclo</label>
+            <input type="number" id="id_puzzles_per_cycle" name="puzzles_per_cycle"
+                   value="{{ form.puzzles_per_cycle.value|default:100 }}"
+                   min="10" max="1000" step="5" required>
+
+            <label for="id_theme_selection_mode">Modo de selección de temas</label>
+            <select id="id_theme_selection_mode" name="theme_selection_mode"
+                    x-model="mode">
+                <option value="weakest" {% if config.theme_selection_mode == "weakest" %}selected{% endif %}>
+                    Más débiles
+                </option>
+                <option value="custom" {% if config.theme_selection_mode == "custom" %}selected{% endif %}>
+                    Personalizado
+                </option>
+            </select>
+
+            <div x-show="mode === 'weakest'">
+                <label for="id_themes_per_cycle">Temas por ciclo</label>
+                <input type="number" id="id_themes_per_cycle" name="themes_per_cycle"
+                       value="{{ form.themes_per_cycle.value|default:10 }}"
+                       min="1" max="50" step="1" required>
+            </div>
+
+            <div x-show="mode === 'custom'">
+                <p style="margin: 0.5rem 0;">
+                    <small>Selecciona los temas que quieres entrenar.</small>
+                </p>
+
+                {% for category in categories %}
+                    <details>
+                        <summary>{{ category.name }}</summary>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.25rem; padding: 0.5rem;">
+                            {% for theme in category.themes.all %}
+                                <label style="margin: 0; cursor: pointer;">
+                                    <input type="checkbox" name="selected_themes"
+                                           value="{{ theme.id }}"
+                                           {% if theme.id in selected_theme_ids %}checked{% endif %}>
+                                    {{ theme.name }}
+                                    {% with elo_val=theme_elos_dict|get_item:theme.id %}
+                                        {% if elo_val %}
+                                            <small class="muted">({{ elo_val }})</small>
+                                        {% endif %}
+                                    {% endwith %}
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset x-show="active">
+            <hgroup>
+                <h4>Blitz Tactics</h4>
+                <small>Modo rápido: resuelve puzzles contra reloj.</small>
+            </hgroup>
+
+            <label for="id_blitz_puzzles">Puzzles por sesión</label>
+            <input type="number" id="id_blitz_puzzles" name="blitz_puzzles"
+                   value="{{ form.blitz_puzzles.value|default:30 }}"
+                   min="5" max="100" step="5" required>
+        </fieldset>
+
+        <fieldset x-show="active">
+            <hgroup>
+                <h4>Vision Rush</h4>
+                <small>Ejercicios de visualización y memoria.</small>
+            </hgroup>
+
+            <label for="id_vision_exercises">Ejercicios por sesión</label>
+            <input type="number" id="id_vision_exercises" name="vision_exercises"
+                   value="{{ form.vision_exercises.value|default:15 }}"
+                   min="5" max="50" step="5" required>
+        </fieldset>
+
+        {% if has_active_cycle and config.is_active %}
+            <p style="text-align: center;">
+                <small class="muted">Hay un ciclo activo. Se actualizará inmediatamente al guardar.</small>
+            </p>
+        {% endif %}
+
+        <div style="text-align: center; margin-top: 1.5rem;">
+            <button type="submit">Guardar configuración</button>
+        </div>
+    </form>
+</article>
+
+{% endblock %}

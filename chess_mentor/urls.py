@@ -11,9 +11,14 @@ urlpatterns = [
 
     # Enviar resultado del puzzle (POST)
     path("puzzle/submit/", views.submit_puzzle, name="submit_puzzle"),
+    # History and progress
     path("history/", views.puzzle_history, name="puzzle_history"),
     path("themes/", views.theme_overview, name="theme_overview"),
     path("progress/", views.elo_progress, name="elo_progress"),
+
+    # Training plan config
+    path("configurar-plan/", views.training_plan_config,
+         name="training_plan_config"),
 
     # Blitz Tactics
     path("blitz-tactics/", views.blitz_tactics_start, name="blitz_tactics_start"),
