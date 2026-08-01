@@ -472,6 +472,14 @@ def home(request):
     if cycle.total_puzzles > 0:
         cycle_progress_percent = round((cycle.completed_puzzles / cycle.total_puzzles) * 100, 1)
 
+    # Temas más débiles y más fuertes
+    weakest_themes = ThemeElo.objects.filter(
+        user=user
+    ).select_related("theme").order_by("elo", "theme__name")[:5]
+    strongest_themes = ThemeElo.objects.filter(
+        user=user
+    ).select_related("theme").order_by("-elo", "theme__name")[:5]
+
     context = {
         "cycle": cycle,
         "elo": user_elo,
@@ -480,6 +488,8 @@ def home(request):
         "endgame": elo_map.get("endgame"),
         "mate": elo_map.get("mate"),
         "cycle_themes_with_elo": cycle_themes_with_elo,
+        "weakest_themes": weakest_themes,
+        "strongest_themes": strongest_themes,
         "days_remaining": days_remaining,
         "cycle_progress_percent": cycle_progress_percent,
         "blitz_target": blitz_target,

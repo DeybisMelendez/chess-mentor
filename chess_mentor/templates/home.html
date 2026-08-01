@@ -33,6 +33,45 @@
     </div>
 </section>
 
+<!-- Debilidades vs Fortalezas -->
+<section style="margin-bottom: 2rem;">
+    <h3>Debilidades vs Fortalezas</h3>
+    <article>
+        <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+            <div>
+                <small style="display: block; margin-bottom: 0.75rem; text-align: center; color: #c62828;">Más débiles</small>
+                {% if weakest_themes %}
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        {% for entry in weakest_themes %}
+                            <li style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid var(--pico-muted-border-color);">
+                                <span>{{ entry.theme.name }}</span>
+                                <strong style="color: #c62828;">{{ entry.elo }}</strong>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="text-align: center; color: var(--pico-muted-color);">Sin datos</p>
+                {% endif %}
+            </div>
+            <div>
+                <small style="display: block; margin-bottom: 0.75rem; text-align: center; color: #2e7d32;">Más fuertes</small>
+                {% if strongest_themes %}
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        {% for entry in strongest_themes %}
+                            <li style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid var(--pico-muted-border-color);">
+                                <span>{{ entry.theme.name }}</span>
+                                <strong style="color: #2e7d32;">{{ entry.elo }}</strong>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="text-align: center; color: var(--pico-muted-color);">Sin datos</p>
+                {% endif %}
+            </div>
+        </div>
+    </article>
+</section>
+
 <!-- Ciclo actual -->
 <section style="margin-bottom: 2rem;">
     <h3>Ciclo actual</h3>
