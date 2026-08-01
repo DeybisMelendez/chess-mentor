@@ -423,7 +423,8 @@ def home(request):
         })
 
     # Blitz Tactics
-    blitz_target = 5
+    config = _get_active_config(user)
+    blitz_target = config.blitz_sessions_per_cycle if config else 5
     blitz_completed = BlitzTacticsSession.objects.filter(
         user=user,
         date__gte=cycle.start_date,
@@ -433,7 +434,7 @@ def home(request):
     blitz_progress_percent = min(round((blitz_completed / blitz_target) * 100, 1), 100) if blitz_target > 0 else 0
 
     # Vision Rush
-    vision_target = 5
+    vision_target = config.vision_sessions_per_cycle if config else 5
     vision_completed = VisionRushSession.objects.filter(
         user=user,
         date__gte=cycle.start_date,

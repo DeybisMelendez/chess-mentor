@@ -29,7 +29,10 @@ class Command(BaseCommand):
 
         # Finales
         "endgame", "pawnEndgame", "rookEndgame", "bishopEndgame", "knightEndgame",
-        "queenEndgame", "queenRookEndgame"
+        "queenEndgame", "queenRookEndgame",
+
+        # Apertura
+        "opening",
     }
 
     def add_arguments(self, parser):
@@ -134,7 +137,7 @@ class Command(BaseCommand):
                            "opening": 0, "middlegame": 0}
 
         for theme_name in lichess_theme_names:
-            if theme_name in ["opening", "middlegame", "endgame", "mate"]:
+            if theme_name in ["middlegame", "endgame", "mate"]:
                 # Estos son categorías, no temas entrenables
                 continue
 
@@ -164,7 +167,7 @@ class Command(BaseCommand):
         created = 0
         updated = 0
         for lichess_name in lichess_theme_names:
-            if lichess_name in ["opening", "middlegame", "endgame", "mate"]:
+            if lichess_name in ["middlegame", "endgame", "mate"]:
                 continue
 
             category = theme_to_category.get(lichess_name)
@@ -215,7 +218,7 @@ class Command(BaseCommand):
         django_trainable_themes = Theme.objects.filter(
             lichess_name__isnull=False
         ).exclude(
-            lichess_name__in=["opening", "middlegame",
+            lichess_name__in=["middlegame",
                               "endgame", "mate"]  # Excluir categorías
         )
 

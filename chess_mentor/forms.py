@@ -14,6 +14,8 @@ class TrainingPlanConfigForm(forms.ModelForm):
             "selected_themes",
             "blitz_puzzles",
             "vision_exercises",
+            "blitz_sessions_per_cycle",
+            "vision_sessions_per_cycle",
         ]
         widgets = {
             "selected_themes": forms.CheckboxSelectMultiple(),

@@ -137,11 +137,11 @@ def convert_csv_to_sqlite():
                 continue
 
             # -----------------------------
-            # Temas principales (ignorar aperturas para reducir temas)
+            # Temas principales
             # -----------------------------
             themes = set(row["Themes"].split())
-            # Ignorar OpeningTags para reducir cantidad de temas únicos
-            # themes.update(row["OpeningTags"].split())
+            if row["OpeningTags"].strip():
+                themes.add("opening")
 
             # Filtrar temas no deseados (muy raros o irrelevantes)
             # Lista de temas principales de ajedrez - temas útiles para entrenamiento
@@ -165,7 +165,10 @@ def convert_csv_to_sqlite():
 
                 # Finales
                 "endgame", "pawnEndgame", "rookEndgame", "bishopEndgame", "knightEndgame",
-                "queenEndgame", "queenRookEndgame"
+                "queenEndgame", "queenRookEndgame",
+
+                # Apertura
+                "opening",
             }
 
             # Filtrar solo temas conocidos para reducir cantidad de temas únicos

@@ -59,6 +59,14 @@ class TrainingPlanConfig(models.Model):
         default=15,
         help_text="Cantidad de ejercicios por sesión de Vision Rush"
     )
+    blitz_sessions_per_cycle = models.PositiveIntegerField(
+        default=5,
+        help_text="Sesiones esperadas de Blitz Tactics por ciclo"
+    )
+    vision_sessions_per_cycle = models.PositiveIntegerField(
+        default=5,
+        help_text="Sesiones esperadas de Vision Rush por ciclo"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
