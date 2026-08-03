@@ -1,10 +1,13 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 
-from .models import (ActiveExercise, Document, DocumentCategory, DocumentTag, Elo,
-                     FreePuzzleAttempt, PuzzleAttempt, RetryPuzzle, Theme,
-                     ThemeCategory, ThemeElo, TrainingCycle,
-                     TrainingCycleTheme, TrainingPreferences)
+from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
+                     Document, DocumentCategory, DocumentTag, Elo,
+                     EloSnapshot, FreeActiveExercise, FreePuzzleAttempt,
+                     PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
+                     ThemeElo, TrainingCycle, TrainingCycleTheme,
+                     TrainingPlanConfig, TrainingPreferences,
+                     VisionRushAttempt, VisionRushSession)
 
 User = get_user_model()
 
@@ -151,14 +154,16 @@ class PuzzleAttemptAdmin(admin.ModelAdmin):
         "user",
         "puzzle_id",
         "solved",
+        "mode",
+        "is_retry",
         "created_at",
     )
-    list_filter = ("solved",  "created_at")
+    list_filter = ("solved", "mode", "created_at")
     search_fields = ("user__username", "puzzle_id")
-    readonly_fields = ("created_at",)
-    autocomplete_fields = ("user",)
+    readonly_fields = ("created_at", "puzzle_rating", "elo_change")
+    autocomplete_fields = ("user", "theme")
     date_hierarchy = "created_at"
-    list_select_related = ("user",)
+    list_select_related = ("user", "theme")
 
 
 @admin.register(ActiveExercise)
@@ -225,3 +230,174 @@ class FreePuzzleAttemptAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user",)
     date_hierarchy = "created_at"
     list_select_related = ("user",)
+
+
+@admin.register(FreeActiveExercise)
+class FreeActiveExerciseAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "puzzle_id",
+        "theme_lichess_name",
+        "rating_min",
+        "rating_max",
+        "created_at",
+    )
+    search_fields = ("user__username", "puzzle_id")
+    readonly_fields = ("created_at",)
+    autocomplete_fields = ("user",)
+    list_select_related = ("user",)
+
+
+@admin.register(TrainingPlanConfig)
+class TrainingPlanConfigAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "is_active",
+        "puzzles_per_cycle",
+        "themes_per_cycle",
+        "theme_selection_mode",
+        "blitz_puzzles",
+        "vision_exercises",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = ("is_active", "theme_selection_mode")
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("user",)
+    list_select_related = ("user",)
+    filter_horizontal = ("selected_themes",)
+
+    fieldsets = (
+        (
+            "Estado",
+            {
+                "fields": (
+                    "user",
+                    "is_active",
+                )
+            },
+        ),
+        (
+            "Ciclo de entrenamiento",
+            {
+                "fields": (
+                    "puzzles_per_cycle",
+                    "themes_per_cycle",
+                    "theme_selection_mode",
+                    "selected_themes",
+                )
+            },
+        ),
+        (
+            "Modos de juego",
+            {
+                "fields": (
+                    "blitz_puzzles",
+                    "vision_exercises",
+                    "blitz_sessions_per_cycle",
+                    "vision_sessions_per_cycle",
+                )
+            },
+        ),
+        (
+            "Metadatos",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+    )
+
+
+@admin.register(BlitzTacticsSession)
+class BlitzTacticsSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "date",
+        "current_puzzle_index",
+        "score",
+        "failures",
+        "time_remaining",
+        "completed",
+        "created_at",
+    )
+    list_filter = ("completed", "date")
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("user",)
+    list_select_related = ("user",)
+    date_hierarchy = "date"
+
+
+@admin.register(BlitzTacticsAttempt)
+class BlitzTacticsAttemptAdmin(admin.ModelAdmin):
+    list_display = (
+        "session",
+        "puzzle_id",
+        "solved",
+        "time_taken",
+        "created_at",
+    )
+    list_filter = ("solved", "created_at")
+    search_fields = (
+        "puzzle_id",
+        "session__user__username",
+    )
+    readonly_fields = ("created_at",)
+    autocomplete_fields = ("session",)
+    date_hierarchy = "created_at"
+    list_select_related = ("session", "session__user")
+
+
+@admin.register(VisionRushSession)
+class VisionRushSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "date",
+        "current_exercise_index",
+        "score",
+        "failures",
+        "completed",
+        "created_at",
+    )
+    list_filter = ("completed", "date")
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("user",)
+    list_select_related = ("user",)
+    date_hierarchy = "date"
+
+
+@admin.register(VisionRushAttempt)
+class VisionRushAttemptAdmin(admin.ModelAdmin):
+    list_display = (
+        "session",
+        "user_answer",
+        "solved",
+        "memorization_time",
+        "response_time",
+        "created_at",
+    )
+    list_filter = ("solved", "created_at")
+    search_fields = (
+        "user_answer",
+        "session__user__username",
+    )
+    readonly_fields = ("created_at",)
+    autocomplete_fields = ("session",)
+    date_hierarchy = "created_at"
+    list_select_related = ("session", "session__user")
+
+
+@admin.register(EloSnapshot)
+class EloSnapshotAdmin(admin.ModelAdmin):
+    list_display = ("user", "date", "global_elo")
+    list_filter = ("date",)
+    search_fields = ("user__username", "user__email")
+    autocomplete_fields = ("user",)
+    list_select_related = ("user",)
+    date_hierarchy = "date"
+    ordering = ("-date",)
