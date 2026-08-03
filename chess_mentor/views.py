@@ -17,7 +17,7 @@ from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      EloSnapshot, FreeActiveExercise, FreePuzzleAttempt,
                      PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPlanConfig, TrainingPreferences,
+                     TrainingPlanConfig,
                      VisionRushSession, VisionRushAttempt)
 from .forms import TrainingPlanConfigForm
 from .repository import LichessDB

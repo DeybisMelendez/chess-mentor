@@ -6,17 +6,10 @@ from .models import (ActiveExercise, BlitzTacticsAttempt, BlitzTacticsSession,
                      EloSnapshot, FreeActiveExercise, FreePuzzleAttempt,
                      PuzzleAttempt, RetryPuzzle, Theme, ThemeCategory,
                      ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPlanConfig, TrainingPreferences,
+                     TrainingPlanConfig,
                      VisionRushAttempt, VisionRushSession)
 
 User = get_user_model()
-
-
-@admin.register(TrainingPreferences)
-class TrainingPreferencesAdmin(admin.ModelAdmin):
-    list_display = ("user", "puzzles_per_cycle")
-    search_fields = ("user__username", "user__email")
-    autocomplete_fields = ("user",)
 
 
 @admin.register(Theme)

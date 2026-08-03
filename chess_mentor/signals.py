@@ -4,7 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .models import (Elo, Theme, ThemeElo, TrainingCycle, TrainingCycleTheme,
-                     TrainingPlanConfig, TrainingPreferences)
+                     TrainingPlanConfig)
 
 User = get_user_model()
 
@@ -14,7 +14,6 @@ def create_user_training_base(sender, instance, created, **kwargs):
     if not created:
         return
 
-    TrainingPreferences.objects.get_or_create(user=instance)
     Elo.objects.get_or_create(user=instance)
 
     themes = Theme.objects.all()

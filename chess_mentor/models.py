@@ -1,21 +1,10 @@
 import math
+import os
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
-
-
-class TrainingPreferences(models.Model):
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="training_preferences"
-    )
-    puzzles_per_cycle = models.PositiveIntegerField(default=105)
-
-    def __str__(self):
-        return f"Preferences - {self.user}"
 
 
 class TrainingPlanConfig(models.Model):
@@ -117,16 +106,6 @@ class Theme(models.Model):
         blank=True,
         help_text="Descripción del tema"
     )
-
-    def clean(self):
-        if not self.category:
-            raise ValidationError(
-                "El tema debe tener una categoría."
-            )
-        if not self.lichess_name:
-            raise ValidationError(
-                "El tema debe tener un lichess_name."
-            )
 
     class Meta:
         ordering = ["name"]
@@ -244,10 +223,6 @@ class ThemeElo(BaseElo):
                 fields=["user", "theme"],
                 name="unique_user_theme_elo"
             )
-        ]
-        indexes = [
-            models.Index(fields=["user"]),
-            models.Index(fields=["theme"]),
         ]
 
     def __str__(self):
@@ -627,8 +602,6 @@ class EloSnapshot(models.Model):
 
 
 def validate_pdf_extension(value):
-    from django.core.exceptions import ValidationError
-    import os
     ext = os.path.splitext(value.name)[1].lower()
     if ext != '.pdf':
         raise ValidationError('Solo se permiten archivos PDF.')
@@ -698,16 +671,3 @@ class Document(models.Model):
         if self.file:
             self.file.delete()
         super().delete(using, keep_parents)
-
-
-"""
-class TrainingStreak(models.Model):
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="training_streak"
-    )
-    current_streak = models.PositiveIntegerField(default=0)
-    longest_streak = models.PositiveIntegerField(default=0)
-    last_training_date = models.DateField(null=True, blank=True)
-"""
