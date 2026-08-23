@@ -1,0 +1,166 @@
+/* Side drawer navigation */
+
+.drawer-toggle {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1001;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pico-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  cursor: pointer;
+  padding: 0;
+  color: var(--pico-color);
+}
+
+.drawer-toggle:hover {
+  background: var(--pico-secondary-background);
+}
+
+.drawer-toggle svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  z-index: 1000;
+}
+
+.drawer-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  max-width: 85vw;
+  background: var(--pico-background-color);
+  border-right: 1px solid var(--pico-muted-border-color);
+  box-shadow: var(--pico-card-box-shadow);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  z-index: 1002;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.drawer.is-open {
+  transform: translateX(0);
+}
+
+.drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.drawer__close {
+  background: none;
+  border: none;
+  color: var(--pico-color);
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  font-size: 1.5rem;
+}
+
+.drawer__close:hover {
+  color: var(--pico-primary);
+}
+
+.drawer__nav {
+  flex: 1;
+  padding: 0.75rem 0;
+}
+
+.drawer__group {
+  padding: 0.5rem 0;
+}
+
+.drawer__group-title {
+  padding: 0.5rem 1.25rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--pico-muted-color);
+}
+
+.drawer__group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.drawer__group li {
+  margin: 0;
+}
+
+.drawer__group a {
+  display: block;
+  padding: 0.6rem 1.25rem;
+  color: var(--pico-color);
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: background 0.15s ease;
+}
+
+.drawer__group a:hover {
+  background: var(--pico-secondary-background);
+}
+
+.drawer__group a.is-active {
+  background: var(--pico-secondary-background);
+  color: var(--pico-primary);
+  font-weight: 600;
+  border-left: 3px solid var(--pico-primary);
+  padding-left: calc(1.25rem - 3px);
+}
+
+body.drawer-open {
+  overflow: hidden;
+}
+
+/* Desktop: drawer is persistent (always visible), toggle button hidden */
+@media (min-width: 769px) {
+  .drawer {
+    transform: translateX(0);
+  }
+
+  .drawer-toggle {
+    display: none;
+  }
+
+  .drawer-backdrop {
+    display: none;
+  }
+
+  main.container {
+    margin-left: 260px;
+    max-width: calc(100% - 260px);
+  }
+}

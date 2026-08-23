@@ -1,39 +1,71 @@
-<header class="container">
-    <nav>
-        <ul>
-            <li><a href="{% url 'home' %}">Home</a></li>
-            {% if user.is_authenticated %}
-            <li>
-                <details class="dropdown">
-                    <summary>
-                    Entrena
-                    </summary>
-                    <ul dir="rtl">
-                    <li><a href="{% url 'get_puzzle' %}">Puzzle</a></li>
-                    <li><a href="{% url 'blitz_tactics_start' %}">Blitz Tactics</a></li>
-                    <li><a href="{% url 'vision_rush_start' %}">Vision Rush</a></li>
-                    <li><a href="{% url 'free_training_start' %}">Libre</a></li>
-                    <li><a href="{% url 'analysis' %}">Auto-análisis</a></li>
-                    </ul>
-                </details>
-            </li>
-            <li>
-                <details class="dropdown">
-                    <summary>
-                    Datos
-                    </summary>
-                    <ul dir="rtl">
-                    <li><a href="{% url 'puzzle_history' %}">Historial</a></li>
-                    <li><a href="{% url 'elo_progress' %}">Progreso</a></li>
-                    <li><a href="{% url 'theme_overview' %}">Temas</a></li>
-                    <li><a href="{% url 'documents' %}">Documentos</a></li>
-                    </ul>
-                </details>
-            </li>
-            <li><a href="{% url 'training_plan_config' %}">Configuracion</a></li>
-            {% else %}
-            <li><a href="{% url 'login' %}">Login</a></li>
-            {% endif %}
-        </ul>
+<button
+    class="drawer-toggle"
+    type="button"
+    aria-label="Abrir menú"
+    aria-controls="primary-drawer"
+    aria-expanded="false"
+>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+        <line x1="4" y1="6" x2="20" y2="6"></line>
+        <line x1="4" y1="12" x2="20" y2="12"></line>
+        <line x1="4" y1="18" x2="20" y2="18"></line>
+    </svg>
+</button>
+
+<div class="drawer-backdrop"></div>
+
+<aside
+    id="primary-drawer"
+    class="drawer"
+    aria-label="Menú principal"
+>
+    <div class="drawer__header">
+        <span>Chess Mentor</span>
+        <button class="drawer__close" type="button" aria-label="Cerrar menú">
+            &times;
+        </button>
+    </div>
+
+    <nav class="drawer__nav">
+        <div class="drawer__group">
+            <ul>
+                <li><a href="{% url 'home' %}">Home</a></li>
+            </ul>
+        </div>
+
+        {% if user.is_authenticated %}
+        <div class="drawer__group">
+            <div class="drawer__group-title">Entrena</div>
+            <ul>
+                <li><a href="{% url 'get_puzzle' %}">Puzzle</a></li>
+                <li><a href="{% url 'blitz_tactics_start' %}">Blitz Tactics</a></li>
+                <li><a href="{% url 'vision_rush_start' %}">Vision Rush</a></li>
+                <li><a href="{% url 'free_training_start' %}">Libre</a></li>
+                <li><a href="{% url 'analysis' %}">Auto-análisis</a></li>
+            </ul>
+        </div>
+
+        <div class="drawer__group">
+            <div class="drawer__group-title">Datos</div>
+            <ul>
+                <li><a href="{% url 'puzzle_history' %}">Historial</a></li>
+                <li><a href="{% url 'elo_progress' %}">Progreso</a></li>
+                <li><a href="{% url 'theme_overview' %}">Temas</a></li>
+                <li><a href="{% url 'documents' %}">Documentos</a></li>
+            </ul>
+        </div>
+
+        <div class="drawer__group">
+            <ul>
+                <li><a href="{% url 'training_plan_config' %}">Configuración</a></li>
+            </ul>
+        </div>
+        {% else %}
+        <div class="drawer__group">
+            <ul>
+                <li><a href="{% url 'login' %}">Login</a></li>
+            </ul>
+        </div>
+        {% endif %}
     </nav>
-</header>
+</aside>

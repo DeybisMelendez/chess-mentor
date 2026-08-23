@@ -13,7 +13,7 @@
         href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css"
         >
     <link rel="stylesheet" href="{% static 'style.css' %}">
-    
+    <link rel="stylesheet" href="{% static 'drawer.css' %}">
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
     {% include 'nav.html' %}
@@ -21,6 +21,6 @@
         {% block content %}
         {% endblock %}
     </main>
-    <script src="//unpkg.com/alpinejs" defer></script>
+    <script src="{% static 'drawer.js' %}"></script>
 </body>
 </html>
